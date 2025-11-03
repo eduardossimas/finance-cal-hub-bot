@@ -538,9 +538,31 @@ export async function processMessage(userId: string, message: string): Promise<s
       if (intent.intent === 'query' && intent.filters) {
         console.log(`📋 Consulta detectada com filtros:`, intent.filters);
         
-        // Se tem data específica
+        // Se tem data específica no formato ISO (YYYY-MM-DD)
         if (intent.filters.date) {
-          return handleDateCommand(userId, intent.filters.date);
+          const dateISO = intent.filters.date;
+          
+          // Verificar se já está no formato ISO
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateISO)) {
+            // Buscar atividades diretamente com a data ISO
+            const activities = await getActivitiesByDate(userId, dateISO);
+            const dateFormatted = formatDate(dateISO);
+
+            if (activities.length === 0) {
+              return `📅 ${dateFormatted}\n\n✨ Nenhuma atividade agendada para esta data.`;
+            }
+
+            let message = `📅 *Atividades - ${dateFormatted}* (${activities.length})\n\n`;
+            
+            activities.forEach((activity, index) => {
+              message += `${formatActivity(activity, index)}\n`;
+            });
+
+            return message;
+          } else {
+            // Se não está no formato ISO, usar handleDateCommand
+            return handleDateCommand(userId, intent.filters.date);
+          }
         }
         
         // Se tem período
