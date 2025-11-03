@@ -186,19 +186,28 @@ export async function handleCreateTaskCommand(userId: string, message: string): 
       return '⚠️ *Nenhum cliente cadastrado*\n\nPara criar atividades, é necessário ter clientes cadastrados na plataforma web.\n\n💡 Acesse o sistema web e cadastre seus clientes primeiro.';
     }
 
-    // Extrair informações da mensagem
+    console.log(`📝 Analisando mensagem: "${message}"`);
+    console.log(`👥 Clientes disponíveis: ${availableClients.map(c => c.name).join(', ')}`);
+
+    // Extrair informações da mensagem (IA já tem acesso à lista de clientes)
     const extracted = await extractTaskInfo(message, availableClients);
 
     if (!extracted) {
       // Listar clientes disponíveis
-      let response = '❌ Não consegui extrair informações suficientes para criar a tarefa.\n\n';
+      let response = '🤔 *Não consegui entender sua mensagem*\n\n';
       response += `📋 *Clientes disponíveis:*\n`;
-      availableClients.slice(0, 10).forEach((client, index) => {
-        response += `• ${client.name}\n`;
+      availableClients.forEach((client, index) => {
+        response += `${index + 1}. ${client.name}\n`;
       });
-      response += `\n💡 *Exemplo:* "criar reunião com ${availableClients[0].name} amanhã às 14h"`;
+      response += `\n💡 *Tente mencionar:*\n`;
+      response += `• O que fazer (ex: "reunião", "ligar", "enviar email")\n`;
+      response += `• Qual cliente (ex: "ConectFin", "Clínica Maria Inês")\n`;
+      response += `• Quando (ex: "hoje", "amanhã", "15/12")\n\n`;
+      response += `🔹 *Exemplo:* "reunião com ${availableClients[0].name} amanhã às 14h"`;
       return response;
     }
+
+    console.log(`✅ Informações extraídas:`, extracted);
 
     // Criar atividade
     const result = await createActivityFromAI(userId, extracted);
@@ -206,32 +215,35 @@ export async function handleCreateTaskCommand(userId: string, message: string): 
     if (result.clientNotFound) {
       // Cliente mencionado não existe
       let response = `⚠️ *Cliente "${extracted.clientName}" não encontrado*\n\n`;
-      response += `📋 *Clientes disponíveis:*\n`;
-      availableClients.slice(0, 10).forEach((client) => {
-        response += `• ${client.name}\n`;
+      response += `📋 *Clientes cadastrados:*\n`;
+      availableClients.forEach((client, index) => {
+        response += `${index + 1}. ${client.name}\n`;
       });
-      response += `\n💡 Use um dos clientes acima ou cadastre "${extracted.clientName}" na plataforma web primeiro.`;
+      response += `\n💡 *Você quis dizer algum destes?*\n`;
+      response += `Ou cadastre "${extracted.clientName}" na plataforma web primeiro.`;
       return response;
     }
 
     if (!result.activity) {
-      return '❌ Erro ao criar a atividade. Tente novamente.';
+      return '❌ Erro ao criar a atividade. Tente novamente ou use "ajuda" para ver os comandos.';
     }
 
     const activity = result.activity;
     const dateFormatted = formatDate(activity.date || '');
+    
     let response = `✅ *Tarefa criada com sucesso!*\n\n`;
-    response += `📝 *Título:* ${activity.title}\n`;
-    if (activity.description) response += `📄 *Descrição:* ${activity.description}\n`;
-    if (extracted.clientName) response += `👤 *Cliente:* ${extracted.clientName}\n`;
-    response += `📅 *Data:* ${dateFormatted}\n`;
-    response += `⏱️ *Duração estimada:* ${activity.estimated_duration}min\n`;
-    response += `📊 *Status:* Pendente\n`;
+    response += `📝 ${activity.title}\n`;
+    if (activity.description) response += `📄 ${activity.description}\n`;
+    response += `👤 Cliente: *${extracted.clientName}*\n`;
+    response += `📅 ${dateFormatted}\n`;
+    response += `⏱️ ${activity.estimated_duration} minutos\n`;
+    response += `📊 Status: ⏳ Pendente\n\n`;
+    response += `💡 Use "hoje" para ver todas as tarefas de hoje`;
 
     return response;
   } catch (error: any) {
-    console.error('Erro ao criar tarefa:', error);
-    return '❌ Erro ao processar sua solicitação. Tente novamente.';
+    console.error('❌ Erro ao criar tarefa:', error);
+    return '❌ Erro ao processar sua solicitação. Verifique sua mensagem e tente novamente.\n\n💡 Use "ajuda" para ver exemplos de comandos.';
   }
 }
 
@@ -367,43 +379,44 @@ export async function handleListClientsCommand(): Promise<string> {
  */
 export function handleHelpCommand(): string {
   return `
-📱 *Finance Cal Hub Bot - Comandos Disponíveis*
+📱 *Finance Cal Hub Bot*
 
-*📊 Consultas de Atividades:*
-• \`hoje\` ou \`atividades\` - Suas atividades de hoje
-• \`restantes\` - O que ainda falta fazer hoje
-• \`fazendo\` ou \`andamento\` - Atividades em progresso
-• \`pendentes\` - Todas as tarefas pendentes
-• \`vencidas\` ou \`atrasadas\` - Tarefas com prazo vencido
-• \`resumo\` - Resumo inteligente do dia com IA
+🚀 *MODO INTELIGENTE ATIVADO*
+Simplesmente escreva o que você precisa fazer e eu crio a tarefa automaticamente!
 
-*📅 Consultas por Data:*
-• \`amanhã\` - Atividades de amanhã
-• \`15/12\` ou \`15/12/2025\` - Atividades de data específica
-• \`próxima semana\` - Atividades da próxima semana
+*Exemplo:*
+• "atividades teste hoje para ConectFin"
+• "reunião com Clínica Maria Inês amanhã"
+• "ligar para Dias Júnior Academy"
 
-*👥 Clientes:*
-• \`clientes\` - Lista todos os clientes disponíveis
+---
 
-*➕ Criar Tarefas:*
-• \`criar [descrição] para [cliente]\` - Cria tarefa com IA
-• \`nova tarefa [descrição]\` - Cria tarefa com IA
-• _Exemplo:_ "criar reunião com Dias Júnior Academy amanhã às 14h"
-• ⚠️ *Cliente é obrigatório!* Use \`clientes\` para ver a lista
+*📊 Ver Suas Tarefas:*
+• \`hoje\` - Tarefas de hoje
+• \`restantes\` - O que falta fazer hoje
+• \`pendentes\` - Todas pendentes
+• \`vencidas\` - Tarefas atrasadas
+• \`resumo\` - Resumo inteligente do dia
+
+*📅 Ver por Data:*
+• \`amanhã\` - Tarefas de amanhã
+• \`15/12\` - Tarefas de data específica
 
 *✅ Concluir Tarefas:*
-• \`concluir [descrição]\` - Marca tarefa como concluída
-• \`finalizar [descrição]\` - Marca tarefa como concluída
-• _Exemplo:_ "concluir reunião com João"
+• \`concluir [nome da tarefa]\`
+• \`finalizar [nome da tarefa]\`
 
-*❓ Perguntas com IA:*
-• Digite qualquer pergunta sobre suas atividades
-• _Exemplo:_ "Quanto tempo vou levar hoje?"
+*👥 Clientes:*
+• \`clientes\` - Ver todos os clientes
 
-*ℹ️ Ajuda:*
-• \`ajuda\` ou \`menu\` - Mostra este menu
+*ℹ️ Outros:*
+• \`ajuda\` - Ver este menu
 
-💡 _Todas as tarefas precisam ter um cliente associado!_
+---
+
+💡 *Dica:* Não precisa usar comandos específicos para criar tarefas. Apenas descreva o que você precisa fazer e eu entendo!
+
+⚠️ *Importante:* Toda tarefa precisa ter um cliente. Use \`clientes\` para ver a lista.
   `.trim();
 }
 
@@ -413,7 +426,7 @@ export function handleHelpCommand(): string {
 export async function processMessage(userId: string, message: string): Promise<string> {
   const normalizedMessage = message.toLowerCase().trim();
 
-  // Comandos específicos de consulta
+  // Comandos específicos de consulta (APENAS ESTES NÃO CRIAM TAREFA)
   if (normalizedMessage === 'hoje' || normalizedMessage === 'atividades') {
     return handleTodayCommand(userId);
   }
@@ -465,15 +478,6 @@ export async function processMessage(userId: string, message: string): Promise<s
     }
   }
 
-  // Comandos de criação de tarefa
-  if (normalizedMessage.startsWith('criar ') || 
-      normalizedMessage.startsWith('nova tarefa ') || 
-      normalizedMessage.startsWith('adicionar ') ||
-      normalizedMessage.startsWith('cadastrar ')) {
-    const taskText = message.replace(/^(criar|nova tarefa|adicionar|cadastrar)\s+/i, '');
-    return handleCreateTaskCommand(userId, taskText);
-  }
-
   // Comandos de conclusão de tarefa
   if (normalizedMessage.startsWith('concluir ') || 
       normalizedMessage.startsWith('finalizar ') || 
@@ -486,19 +490,7 @@ export async function processMessage(userId: string, message: string): Promise<s
     return handleCompleteTaskCommand(userId, taskText);
   }
 
-  // Se parece uma descrição de tarefa (contém palavras-chave)
-  const taskKeywords = ['reunião', 'reuniao', 'ligar', 'enviar', 'fazer', 'preparar', 'revisar', 'atualizar', 'corrigir', 'terminar', 'finalizar'];
-  const hasTaskKeyword = taskKeywords.some(keyword => normalizedMessage.includes(keyword));
-  
-  if (hasTaskKeyword && normalizedMessage.length > 10) {
-    return handleCreateTaskCommand(userId, message);
-  }
-
-  // Se não é um comando, trata como pergunta para a IA
-  if (normalizedMessage.length > 5) {
-    return handleQuestionCommand(userId, message);
-  }
-
-  // Fallback
-  return handleHelpCommand();
+  // QUALQUER OUTRA MENSAGEM É TRATADA COMO CRIAÇÃO DE TAREFA
+  // A IA vai identificar o cliente e extrair as informações
+  return handleCreateTaskCommand(userId, message);
 }

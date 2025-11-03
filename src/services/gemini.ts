@@ -70,43 +70,54 @@ export async function extractTaskInfo(
   date?: string;
 } | null> {
   const today = new Date().toISOString().split('T')[0];
-  const clientNames = availableClients.map(c => c.name).join(', ');
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowDate = tomorrow.toISOString().split('T')[0];
+  
+  // Formatar lista de clientes de forma mais clara
+  const clientsList = availableClients.map((c, i) => `${i + 1}. ${c.name}`).join('\n');
   
   const prompt = `
-Você é um assistente que extrai informações de tarefas a partir de mensagens em português.
+Você é um assistente especializado em extrair informações de tarefas/atividades a partir de mensagens em português do Brasil.
 
-Mensagem do usuário: "${message}"
+**MENSAGEM DO USUÁRIO:**
+"${message}"
 
-Data de hoje: ${new Date().toLocaleDateString('pt-BR')} (${today})
+**DATA DE HOJE:** ${new Date().toLocaleDateString('pt-BR')} (${today})
+**DATA DE AMANHÃ:** ${tomorrow.toLocaleDateString('pt-BR')} (${tomorrowDate})
 
-**CLIENTES DISPONÍVEIS NA BASE DE DADOS:**
-${clientNames}
+**CLIENTES DISPONÍVEIS (escolha um OBRIGATORIAMENTE):**
+${clientsList}
 
-Extraia as seguintes informações em formato JSON válido:
+**INSTRUÇÕES:**
+Analise a mensagem do usuário e extraia as seguintes informações no formato JSON:
+
 {
-  "title": "título conciso da tarefa (obrigatório, máximo 100 caracteres)",
-  "description": "descrição detalhada se houver (opcional)",
-  "clientName": "nome EXATO do cliente da lista acima (OBRIGATÓRIO - escolha o mais similar se não for exato)",
-  "estimatedDuration": tempo estimado em MINUTOS como número inteiro (opcional, padrão 60),
-  "date": "data no formato YYYY-MM-DD (opcional, padrão ${today})"
+  "title": "título claro e conciso da tarefa (máximo 100 caracteres)",
+  "description": "descrição detalhada, se houver (opcional)",
+  "clientName": "nome EXATO de um cliente da lista acima (OBRIGATÓRIO)",
+  "estimatedDuration": tempo estimado em MINUTOS (número inteiro, padrão 60),
+  "date": "data no formato YYYY-MM-DD (padrão ${today})"
 }
 
-**REGRAS IMPORTANTES:**
-1. O campo "clientName" é OBRIGATÓRIO - SEMPRE escolha um cliente da lista acima
-2. Se o usuário mencionar um cliente, encontre o nome mais similar na lista
-3. Se não mencionar cliente, escolha o mais provável baseado no contexto
-4. Use o nome EXATO da lista de clientes disponíveis
-5. Se mencionar "hoje", use a data ${today}
-6. Se mencionar "amanhã", calcule a data de amanhã
-7. Se mencionar duração em horas, converta para minutos
-8. Sempre retorne JSON válido
+**REGRAS CRÍTICAS:**
+1. **clientName é OBRIGATÓRIO** - Identifique qual cliente da lista acima está relacionado à tarefa
+2. Se o usuário mencionar um nome de cliente, encontre o correspondente EXATO na lista
+3. Se o usuário mencionar apenas "ConectFin", use "ConectFin"
+4. Se mencionar "Clínica", "Maria Inês" ou similar, use "Clínica Maria Inês"
+5. Se mencionar "Dias Júnior", "Academy" ou similar, use "Dias Júnior Academy"
+6. Se não mencionar cliente explicitamente, tente inferir pelo contexto (ex: "reunião" pode ser qualquer cliente)
+7. Se realmente não conseguir identificar, escolha o primeiro cliente da lista
+8. Para "hoje" → use ${today}
+9. Para "amanhã" → use ${tomorrowDate}
+10. Duração em horas → converta para minutos (ex: 2h = 120 min)
 
-Exemplos:
-- "reunião com João" → clientName deve ser "Dias Júnior Academy" se João trabalha lá
-- "tarefa para clínica" → clientName deve ser "Clínica Maria Inês"
-- "atividade EVO" → clientName deve ser "EVO"
+**EXEMPLOS:**
+- "atividades teste hoje para cliente ConectFin" → {"title": "Atividades teste", "clientName": "ConectFin", "date": "${today}"}
+- "reunião com clínica amanhã" → {"title": "Reunião", "clientName": "Clínica Maria Inês", "date": "${tomorrowDate}"}
+- "ligar para Dias Júnior" → {"title": "Ligar", "clientName": "Dias Júnior Academy", "date": "${today}"}
 
-Retorne APENAS o JSON, sem texto adicional.
+**RETORNE APENAS O JSON, SEM TEXTO ADICIONAL.**
 `.trim();
 
   try {
@@ -124,6 +135,7 @@ Retorne APENAS o JSON, sem texto adicional.
     
     // Validar que tem título E cliente
     if (!extracted.title || extracted.title.trim() === '') {
+      console.log('⚠️ IA não conseguiu extrair o título da tarefa');
       return null;
     }
 
@@ -135,6 +147,7 @@ Retorne APENAS o JSON, sem texto adicional.
     return extracted;
   } catch (error: any) {
     console.error('Erro ao extrair informações da tarefa:', error.message);
+    console.error('Resposta da IA:', error);
     return null;
   }
 }
