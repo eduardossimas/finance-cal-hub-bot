@@ -10,7 +10,6 @@ import P from 'pino';
 const qrcode: any = require('qrcode-terminal');
 import { getUserIdByPhone } from '../services/activities';
 import { processMessage } from './handlers';
-ssh -i ~/.ssh/finance-bot-key.pem ubuntu@54.123.45.67
 const logger = P({ level: 'info' });
 
 /**
@@ -64,32 +63,84 @@ export async function startWhatsAppBot(): Promise<WASocket> {
       const from = msg.key.remoteJid;
       if (!from) continue;
 
-      // Extrair texto da mensagem
-      const text = 
-        msg.message?.conversation ||
-        msg.message?.extendedTextMessage?.text ||
-        '';
+      // Extrair número de telefone (formato: 5511999999999@s.whatsapp.net)
+      const phone = from.split('@')[0];
+      const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
 
-      if (!text) continue;
+      // Buscar userId associado ao telefone
+      const userId = await getUserIdByPhone(formattedPhone);
 
-      console.log(`📩 Mensagem de ${from}: ${text}`);
+      if (!userId) {
+        // ⚠️ NÚMERO NÃO CADASTRADO - IGNORAR MENSAGEM
+        console.log(`⚠️ Mensagem ignorada de número não cadastrado: ${formattedPhone}`);
+        continue;
+      }
 
       try {
-        // Extrair número de telefone (formato: 5511999999999@s.whatsapp.net)
-        const phone = from.split('@')[0];
-        const formattedPhone = phone.startsWith('+') ? phone : `+${phone}`;
+        let textToProcess = '';
+        let response = '';
 
-        // Buscar userId associado ao telefone
-        const userId = await getUserIdByPhone(formattedPhone);
-
-        if (!userId) {
-          // ⚠️ NÚMERO NÃO CADASTRADO - IGNORAR MENSAGEM
-          console.log(`⚠️ Mensagem ignorada de número não cadastrado: ${formattedPhone}`);
+        // Processar diferentes tipos de mensagem
+        const messageType = Object.keys(msg.message || {})[0];
+        
+        // Mensagem de texto
+        if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
+          textToProcess = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+        }
+        // Mensagem de áudio
+        else if (msg.message?.audioMessage) {
+          console.log(`🎤 Áudio recebido de ${from}`);
+          response = '🎤 *Áudio recebido!*\n\n';
+          response += '⚠️ A transcrição de áudio ainda está em desenvolvimento.\n\n';
+          response += '💡 Por enquanto, você pode:\n';
+          response += '• Enviar mensagens de texto\n';
+          response += '• Usar comandos como "hoje", "vencidas", "criar tarefa"\n';
+          response += '• Descrever tarefas naturalmente\n\n';
+          response += '_Em breve: transcrição automática de áudio com IA!_';
+          
+          await sock.sendMessage(from, { text: response });
+          console.log(`✅ Resposta sobre áudio enviada para ${from}`);
+          continue;
+        }
+        // Mensagem de imagem
+        else if (msg.message?.imageMessage) {
+          console.log(`🖼️ Imagem recebida de ${from}`);
+          
+          const caption = msg.message.imageMessage.caption || '';
+          
+          if (caption) {
+            textToProcess = caption;
+            console.log(`📝 Legenda da imagem: ${caption}`);
+          } else {
+            response = '🖼️ *Imagem recebida!*\n\n';
+            response += '⚠️ A análise de imagens ainda está em desenvolvimento.\n\n';
+            response += '💡 Você pode adicionar uma legenda à imagem descrevendo a tarefa!\n\n';
+            response += '_Em breve: extração automática de texto e tarefas de imagens!_';
+            
+            await sock.sendMessage(from, { text: response });
+            console.log(`✅ Resposta sobre imagem enviada para ${from}`);
+            continue;
+          }
+        }
+        // Outros tipos de mensagem
+        else {
+          console.log(`❓ Tipo de mensagem não suportado: ${messageType}`);
+          response = '❓ *Tipo de mensagem não suportado*\n\n';
+          response += 'No momento, suporto:\n';
+          response += '• 📝 Mensagens de texto\n';
+          response += '• 🖼️ Imagens com legenda\n\n';
+          response += 'Use "ajuda" para ver os comandos disponíveis!';
+          
+          await sock.sendMessage(from, { text: response });
           continue;
         }
 
+        if (!textToProcess) continue;
+
+        console.log(`📩 Mensagem de ${from}: ${textToProcess}`);
+
         // Processar mensagem e obter resposta
-        const response = await processMessage(userId, text);
+        response = await processMessage(userId, textToProcess);
 
         // Enviar resposta
         await sock.sendMessage(from, { text: response });

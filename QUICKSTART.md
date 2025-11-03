@@ -58,10 +58,29 @@ npm run dev
 Envie pelo WhatsApp:
 - `ajuda` - Ver comandos
 - `hoje` - Ver atividades de hoje
+- `criar teste de tarefa` - Criar nova tarefa
+- `concluir teste` - ✨ **NOVO:** Concluir tarefa
 - `resumo` - Resumo com IA
 
 ---
 
-✅ **Pronto!** O bot está funcionando.
+## ✨ Nova Funcionalidade: Concluir Tarefas
 
-📚 Veja o [SETUP-FINAL.md](SETUP-FINAL.md) para mais detalhes.
+### Como usar:
+```
+concluir reunião com João
+finalizar relatório
+concluída proposta
+```
+
+A IA identifica automaticamente qual tarefa você quer concluir! 🤖
+
+---
+
+✅ **Pronto!** O bot está funcionando com todas as features.
+
+📚 Veja os arquivos de documentação:
+- `FUNCIONALIDADES_WHATSAPP.md` - Todas as funcionalidades
+- `EXEMPLOS_MENSAGENS.md` - Exemplos visuais de mensagens
+- `TESTES_WHATSAPP.md` - Guia completo de testes
+- `DICAS_USO.md` - Dicas e troubleshooting

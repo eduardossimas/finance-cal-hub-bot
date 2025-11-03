@@ -29,19 +29,40 @@ export async function sendDailySummaries(sock: WASocket): Promise<void> {
       const whatsappId = `${phone}@s.whatsapp.net`;
 
       let message: string;
+      const today = new Date().toLocaleDateString('pt-BR', { 
+        weekday: 'long', 
+        day: '2-digit', 
+        month: 'long', 
+        year: 'numeric' 
+      });
 
       if (activities.length === 0) {
-        message = `🌅 *Bom dia, ${user.name}!*\n\nVocê não tem atividades programadas para hoje. Aproveite! 🎉`;
+        message = `🌅 *Bom dia, ${user.name}!*\n\n`;
+        message += `📅 *${today}*\n\n`;
+        message += `🎉 Você não tem atividades programadas para hoje!\n\n`;
+        message += `✨ Aproveite seu dia livre ou que tal planejar algo novo?\n\n`;
+        message += `💡 _Use "criar [tarefa]" para adicionar novas atividades._`;
       } else {
-        message = `🌅 *Bom dia, ${user.name}! Suas atividades para hoje*\n\n`;
-        message += `Total: ${activities.length} ${activities.length === 1 ? 'atividade' : 'atividades'}\n\n`;
+        const pending = activities.filter(a => a.status === 'pending').length;
+        const doing = activities.filter(a => a.status === 'doing').length;
+        const waiting = activities.filter(a => a.status?.includes('waiting')).length;
 
+        message = `🌅 *Bom dia, ${user.name}!*\n\n`;
+        message += `📅 *${today}*\n\n`;
+        message += `📊 *Resumo do Dia:*\n`;
+        message += `• Total: ${activities.length} ${activities.length === 1 ? 'atividade' : 'atividades'}\n`;
+        if (pending > 0) message += `• ⏳ Pendentes: ${pending}\n`;
+        if (doing > 0) message += `• ▶️ Em andamento: ${doing}\n`;
+        if (waiting > 0) message += `• ⏸️ Aguardando: ${waiting}\n`;
+        message += `\n`;
+
+        message += `📋 *Suas atividades:*\n`;
         activities.forEach((activity, index) => {
           message += `${formatActivity(activity, index)}\n`;
         });
 
         message += `\n💪 Vamos começar o dia com produtividade!\n`;
-        message += `💡 Use "resumo" para ver um resumo inteligente`;
+        message += `💡 _Use "resumo" para ver uma análise inteligente_`;
       }
 
       await sock.sendMessage(whatsappId, { text: message });
