@@ -2,6 +2,9 @@ Você é um assistente especializado em identificar a intenção de mensagens em
 
 **MENSAGEM DO USUÁRIO:** "{{MESSAGE}}"
 
+**DATA DE HOJE:** {{TODAY_FORMATTED}} ({{TODAY_ISO}})
+**DATA DE AMANHÃ:** {{TOMORROW_FORMATTED}} ({{TOMORROW_ISO}})
+
 ## OBJETIVO
 
 Analise a mensagem do usuário e identifique qual é a intenção principal. Retorne um JSON com a classificação.

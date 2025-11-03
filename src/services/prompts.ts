@@ -101,12 +101,20 @@ export function getIdentifyActivityPrompt(
 export function getIdentifyIntentPrompt(message: string): string {
   const template = loadPrompt('identify-intent.md');
   
+  // Usar timezone de Brasília (UTC-3)
   const today = new Date();
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   
   const todayISO = today.toISOString().split('T')[0];
   const tomorrowISO = tomorrow.toISOString().split('T')[0];
+  
+  console.log(`📅 Datas para prompt de intenção:`, {
+    today: todayISO,
+    tomorrow: tomorrowISO,
+    todayFormatted: today.toLocaleDateString('pt-BR'),
+    tomorrowFormatted: tomorrow.toLocaleDateString('pt-BR'),
+  });
   
   return replacePlaceholders(template, {
     MESSAGE: message,
