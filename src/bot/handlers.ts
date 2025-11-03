@@ -15,7 +15,34 @@ import {
   getDaysOverdue,
   parseNaturalDate,
 } from '../services/activities';
-import { summarizeActivities, answerQuestion, extractTaskInfo, identifyActivityToComplete } from '../services/gemini';
+import { summarizeActivities, answerQuestion, extractTaskInfo, identifyActivityToComplete } from '../services/ai';
+
+/**
+ * Converte HTML de descrição para texto legível para WhatsApp
+ */
+function htmlToReadableText(html: string): string {
+  if (!html) return '';
+  
+  // Remove o cabeçalho <h3>Cliente Assistant</h3>
+  let text = html.replace(/<h3>.*?Assistant<\/h3>/gi, '');
+  
+  // Extrai itens da task list
+  const taskItemRegex = /<li[^>]*data-type="taskItem"[^>]*>.*?<p>(.*?)<\/p>.*?<\/li>/gi;
+  const matches = Array.from(html.matchAll(taskItemRegex));
+  
+  if (matches.length > 0) {
+    const items = matches.map((match, index) => `   ${index + 1}. ${match[1]}`);
+    return items.join('\n');
+  }
+  
+  // Se não tem task list, pega conteúdo de <p>
+  text = text.replace(/<p>(.*?)<\/p>/gi, '$1');
+  
+  // Remove outras tags HTML
+  text = text.replace(/<[^>]*>/g, '');
+  
+  return text.trim();
+}
 
 /**
  * Handler para comando "hoje" ou "atividades"
@@ -233,8 +260,16 @@ export async function handleCreateTaskCommand(userId: string, message: string): 
     
     let response = `✅ *Tarefa criada com sucesso!*\n\n`;
     response += `📝 ${activity.title}\n`;
-    if (activity.description) response += `📄 ${activity.description}\n`;
-    response += `👤 Cliente: *${extracted.clientName}*\n`;
+    
+    // Converter HTML para texto legível
+    if (activity.description) {
+      const readableDescription = htmlToReadableText(activity.description);
+      if (readableDescription) {
+        response += `\n� *Itens:*\n${readableDescription}\n`;
+      }
+    }
+    
+    response += `\n👤 Cliente: *${extracted.clientName}*\n`;
     response += `📅 ${dateFormatted}\n`;
     response += `⏱️ ${activity.estimated_duration} minutos\n`;
     response += `📊 Status: ⏳ Pendente\n\n`;

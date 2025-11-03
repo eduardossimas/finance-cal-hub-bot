@@ -1,4 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import {
   getExtractTaskInfoPrompt,
@@ -9,22 +10,65 @@ import {
 
 dotenv.config();
 
-const apiKey = process.env.GEMINI_API_KEY;
+// Configuração do provider de IA
+const AI_PROVIDER = process.env.AI_PROVIDER || 'openai'; // 'openai' ou 'gemini'
 
-if (!apiKey) {
-  throw new Error('❌ GEMINI_API_KEY não configurada no .env');
+// Configurar OpenAI
+let openai: OpenAI | null = null;
+if (AI_PROVIDER === 'openai') {
+  const openaiKey = process.env.OPENAI_API_KEY;
+  if (!openaiKey) {
+    throw new Error('❌ OPENAI_API_KEY não configurada no .env');
+  }
+  openai = new OpenAI({ apiKey: openaiKey });
+  console.log('✅ Cliente OpenAI inicializado');
 }
 
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+// Configurar Gemini
+let genAI: GoogleGenerativeAI | null = null;
+let geminiModel: any = null;
+if (AI_PROVIDER === 'gemini') {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
+    throw new Error('❌ GEMINI_API_KEY não configurada no .env');
+  }
+  genAI = new GoogleGenerativeAI(geminiKey);
+  geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+  console.log('✅ Cliente Gemini AI inicializado');
+}
 
+/**
+ * Gera resposta usando o provider configurado (OpenAI ou Gemini)
+ */
 export async function generateResponse(prompt: string): Promise<string> {
   try {
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    return response.text();
+    if (AI_PROVIDER === 'openai' && openai) {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o-mini', // Modelo mais barato e rápido
+        messages: [
+          {
+            role: 'system',
+            content: 'Você é um assistente inteligente especializado em gestão de atividades e tarefas.',
+          },
+          {
+            role: 'user',
+            content: prompt,
+          },
+        ],
+        temperature: 0.7,
+        max_tokens: 1000,
+      });
+
+      return response.choices[0]?.message?.content || '';
+    } else if (AI_PROVIDER === 'gemini' && geminiModel) {
+      const result = await geminiModel.generateContent(prompt);
+      const response = await result.response;
+      return response.text();
+    } else {
+      throw new Error('❌ Provider de IA não configurado corretamente');
+    }
   } catch (error: any) {
-    console.error('❌ Erro ao gerar resposta com Gemini:', error.message);
+    console.error(`❌ Erro ao gerar resposta com ${AI_PROVIDER.toUpperCase()}:`, error.message);
     throw error;
   }
 }
@@ -92,14 +136,11 @@ export async function extractTaskInfo(
 }
 
 /**
- * Transcreve áudio usando Gemini (simulado)
+ * Transcreve áudio usando IA (simulado)
  */
 export async function transcribeAudio(audioBase64: string): Promise<string | null> {
   // NOTA: Baileys fornece áudio em base64
-  // Gemini Pro não suporta áudio diretamente ainda
-  // Esta é uma função preparada para quando suportar
-  
-  console.log('⚠️ Transcrição de áudio ainda não implementada no Gemini');
+  console.log('⚠️ Transcrição de áudio ainda não implementada');
   return null;
 }
 
@@ -108,7 +149,6 @@ export async function transcribeAudio(audioBase64: string): Promise<string | nul
  */
 export async function analyzeImage(imageBase64: string): Promise<string | null> {
   try {
-    // Usar gemini-pro-vision quando disponível
     console.log('⚠️ Análise de imagem ainda não implementada');
     return null;
   } catch (error: any) {
@@ -154,4 +194,4 @@ export async function identifyActivityToComplete(
   }
 }
 
-console.log('✅ Cliente Gemini AI inicializado');
+console.log(`✅ Sistema de IA inicializado (Provider: ${AI_PROVIDER.toUpperCase()})`);
