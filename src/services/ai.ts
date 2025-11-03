@@ -6,6 +6,7 @@ import {
   getSummarizeActivitiesPrompt,
   getAnswerQuestionPrompt,
   getIdentifyActivityPrompt,
+  getIdentifyIntentPrompt,
 } from './prompts';
 
 dotenv.config();
@@ -190,6 +191,47 @@ export async function identifyActivityToComplete(
     return result;
   } catch (error: any) {
     console.error('Erro ao identificar atividade:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Identifica a intenção da mensagem do usuário
+ */
+export async function identifyIntent(message: string): Promise<{
+  intent: 'query' | 'create_task' | 'update_task' | 'summary' | 'question';
+  action: string;
+  filters?: {
+    date?: string;
+    period?: string;
+    client?: string;
+  };
+  operation?: string;
+  period?: string;
+} | null> {
+  const prompt = getIdentifyIntentPrompt(message);
+
+  try {
+    const response = await generateResponse(prompt);
+    
+    // Limpar resposta (remover markdown se houver)
+    let jsonText = response.trim();
+    if (jsonText.startsWith('```json')) {
+      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+    } else if (jsonText.startsWith('```')) {
+      jsonText = jsonText.replace(/```\n?/g, '');
+    }
+    
+    const result = JSON.parse(jsonText);
+    
+    if (!result.intent || !result.action) {
+      console.log('⚠️ IA não conseguiu identificar a intenção da mensagem');
+      return null;
+    }
+    
+    return result;
+  } catch (error: any) {
+    console.error('Erro ao identificar intenção:', error.message);
     return null;
   }
 }

@@ -95,4 +95,26 @@ export function getIdentifyActivityPrompt(
   });
 }
 
+/**
+ * Gera prompt para identificar intenção da mensagem
+ */
+export function getIdentifyIntentPrompt(message: string): string {
+  const template = loadPrompt('identify-intent.md');
+  
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  
+  const todayISO = today.toISOString().split('T')[0];
+  const tomorrowISO = tomorrow.toISOString().split('T')[0];
+  
+  return replacePlaceholders(template, {
+    MESSAGE: message,
+    TODAY_FORMATTED: today.toLocaleDateString('pt-BR'),
+    TODAY_ISO: todayISO,
+    TOMORROW_FORMATTED: tomorrow.toLocaleDateString('pt-BR'),
+    TOMORROW_ISO: tomorrowISO,
+  });
+}
+
 console.log('✅ Sistema de prompts inicializado');

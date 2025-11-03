@@ -15,7 +15,7 @@ import {
   getDaysOverdue,
   parseNaturalDate,
 } from '../services/activities';
-import { summarizeActivities, answerQuestion, extractTaskInfo, identifyActivityToComplete } from '../services/ai';
+import { summarizeActivities, answerQuestion, extractTaskInfo, identifyActivityToComplete, identifyIntent } from '../services/ai';
 
 /**
  * Converte HTML de descrição para texto legível para WhatsApp
@@ -525,7 +525,69 @@ export async function processMessage(userId: string, message: string): Promise<s
     return handleCompleteTaskCommand(userId, taskText);
   }
 
-  // QUALQUER OUTRA MENSAGEM É TRATADA COMO CRIAÇÃO DE TAREFA
+  // 🆕 USAR IA PARA IDENTIFICAR INTENÇÃO DA MENSAGEM
+  console.log(`🤖 Identificando intenção da mensagem: "${message}"`);
+  
+  try {
+    const intent = await identifyIntent(message);
+    
+    if (intent) {
+      console.log(`✅ Intenção identificada:`, intent);
+      
+      // Se for consulta (query), buscar atividades
+      if (intent.intent === 'query' && intent.filters) {
+        console.log(`📋 Consulta detectada com filtros:`, intent.filters);
+        
+        // Se tem data específica
+        if (intent.filters.date) {
+          return handleDateCommand(userId, intent.filters.date);
+        }
+        
+        // Se tem período
+        if (intent.filters.period) {
+          if (intent.filters.period === 'today') {
+            return handleTodayCommand(userId);
+          }
+          if (intent.filters.period === 'current_week') {
+            return '📅 *Atividades da Semana Atual*\n\nRecurso em desenvolvimento! Por enquanto, use "hoje", "amanhã" ou datas específicas (DD/MM).';
+          }
+        }
+        
+        // Consulta genérica de hoje
+        return handleTodayCommand(userId);
+      }
+      
+      // Se for resumo
+      if (intent.intent === 'summary') {
+        return handleSummaryCommand(userId);
+      }
+      
+      // Se for atualização de tarefa
+      if (intent.intent === 'update_task') {
+        if (intent.operation === 'complete') {
+          return handleCompleteTaskCommand(userId, message);
+        }
+        return '⚠️ Operação de atualização ainda não implementada. Use "concluir [tarefa]" para marcar como concluída.';
+      }
+      
+      // Se for pergunta
+      if (intent.intent === 'question') {
+        return handleQuestionCommand(userId, message);
+      }
+      
+      // Se for criar tarefa, continua para o fluxo normal abaixo
+      if (intent.intent === 'create_task') {
+        console.log(`➕ Criação de tarefa detectada`);
+        return handleCreateTaskCommand(userId, message);
+      }
+    }
+  } catch (error: any) {
+    console.error('❌ Erro ao identificar intenção:', error);
+    // Em caso de erro, tenta criar tarefa (comportamento padrão)
+  }
+
+  // FALLBACK: QUALQUER OUTRA MENSAGEM É TRATADA COMO CRIAÇÃO DE TAREFA
   // A IA vai identificar o cliente e extrair as informações
+  console.log(`📝 Tentando criar tarefa (fallback)`);
   return handleCreateTaskCommand(userId, message);
 }
