@@ -82,12 +82,23 @@ export async function startWhatsAppBot(): Promise<WASocket> {
         let textToProcess = '';
         let response = '';
 
+        // LOG: Ver estrutura completa da mensagem
+        console.log('\n📨 ========================================');
+        console.log('📨 NOVA MENSAGEM RECEBIDA');
+        console.log('📨 ========================================');
+        console.log('De:', from);
+        console.log('Keys da mensagem:', Object.keys(msg.message || {}));
+        console.log('Mensagem completa:', JSON.stringify(msg.message, null, 2));
+        console.log('📨 ========================================\n');
+
         // Processar diferentes tipos de mensagem
         const messageType = Object.keys(msg.message || {})[0];
+        console.log(`🔍 Tipo de mensagem detectado: "${messageType}"`);
         
         // Mensagem de texto
         if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
           textToProcess = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
+          console.log(`📝 Processando como TEXTO: "${textToProcess}"`);
         }
         // Mensagem de áudio
         else if (msg.message?.audioMessage) {
