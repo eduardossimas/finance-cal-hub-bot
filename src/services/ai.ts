@@ -137,12 +137,33 @@ export async function extractTaskInfo(
 }
 
 /**
- * Transcreve áudio usando IA (simulado)
+ * Transcreve áudio usando OpenAI Whisper
  */
-export async function transcribeAudio(audioBase64: string): Promise<string | null> {
-  // NOTA: Baileys fornece áudio em base64
-  console.log('⚠️ Transcrição de áudio ainda não implementada');
-  return null;
+export async function transcribeAudio(audioBuffer: Buffer): Promise<string | null> {
+  try {
+    if (AI_PROVIDER !== 'openai' || !openai) {
+      console.error('❌ Transcrição de áudio requer OpenAI como provider');
+      return null;
+    }
+
+    console.log('🎤 Iniciando transcrição de áudio...');
+
+    // Criar um objeto File a partir do buffer
+    const audioFile = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' });
+
+    // Usar Whisper para transcrever
+    const transcription = await openai.audio.transcriptions.create({
+      file: audioFile,
+      model: 'whisper-1',
+      language: 'pt', // Português
+    });
+
+    console.log('✅ Áudio transcrito com sucesso');
+    return transcription.text;
+  } catch (error: any) {
+    console.error('❌ Erro ao transcrever áudio:', error.message);
+    return null;
+  }
 }
 
 /**

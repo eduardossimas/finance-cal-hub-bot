@@ -10,6 +10,8 @@ import P from 'pino';
 const qrcode: any = require('qrcode-terminal');
 import { getUserIdByPhone } from '../services/activities';
 import { processMessage } from './handlers';
+import { transcribeAudio } from '../services/ai';
+import { downloadMediaMessage } from '@whiskeysockets/baileys';
 const logger = P({ level: 'info' });
 
 /**
@@ -90,17 +92,58 @@ export async function startWhatsAppBot(): Promise<WASocket> {
         // Mensagem de áudio
         else if (msg.message?.audioMessage) {
           console.log(`🎤 Áudio recebido de ${from}`);
-          response = '🎤 *Áudio recebido!*\n\n';
-          response += '⚠️ A transcrição de áudio ainda está em desenvolvimento.\n\n';
-          response += '💡 Por enquanto, você pode:\n';
-          response += '• Enviar mensagens de texto\n';
-          response += '• Usar comandos como "hoje", "vencidas", "criar tarefa"\n';
-          response += '• Descrever tarefas naturalmente\n\n';
-          response += '_Em breve: transcrição automática de áudio com IA!_';
           
-          await sock.sendMessage(from, { text: response });
-          console.log(`✅ Resposta sobre áudio enviada para ${from}`);
-          continue;
+          try {
+            // Baixar o áudio
+            const buffer = await downloadMediaMessage(
+              msg,
+              'buffer',
+              {},
+              {
+                logger,
+                reuploadRequest: sock.updateMediaMessage
+              }
+            );
+
+            if (!buffer) {
+              throw new Error('Não foi possível baixar o áudio');
+            }
+
+            console.log(`📥 Áudio baixado, tamanho: ${buffer.length} bytes`);
+
+            // Transcrever usando OpenAI Whisper
+            const transcription = await transcribeAudio(buffer as Buffer);
+
+            if (!transcription) {
+              response = '❌ *Erro ao transcrever áudio*\n\n';
+              response += 'Não consegui processar o áudio. Tente:\n';
+              response += '• Enviar novamente\n';
+              response += '• Usar mensagem de texto\n';
+              response += '• Verificar se o áudio está claro';
+              
+              await sock.sendMessage(from, { text: response });
+              console.log(`⚠️ Falha na transcrição do áudio de ${from}`);
+              continue;
+            }
+
+            console.log(`✅ Áudio transcrito: "${transcription}"`);
+            
+            // Processar a transcrição como uma mensagem de texto normal
+            textToProcess = transcription;
+            
+            // Enviar feedback ao usuário
+            await sock.sendMessage(from, { 
+              text: `🎤 *Áudio transcrito:*\n"${transcription}"\n\n⏳ _Processando..._` 
+            });
+          } catch (error: any) {
+            console.error('❌ Erro ao processar áudio:', error);
+            response = '❌ *Erro ao processar áudio*\n\n';
+            response += 'Ocorreu um erro ao processar seu áudio.\n';
+            response += '💡 Tente enviar uma mensagem de texto ou grave o áudio novamente.';
+            
+            await sock.sendMessage(from, { text: response });
+            continue;
+          }
         }
         // Mensagem de imagem
         else if (msg.message?.imageMessage) {

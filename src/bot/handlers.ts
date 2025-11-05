@@ -424,6 +424,9 @@ Simplesmente escreva o que você precisa fazer e eu crio a tarefa automaticament
 • "reunião com Clínica Maria Inês amanhã"
 • "ligar para Dias Júnior Academy"
 
+🎤 *ÁUDIOS SUPORTADOS!*
+Você pode enviar áudios e eu vou transcrever automaticamente usando IA!
+
 ---
 
 *📊 Ver Suas Tarefas:*
