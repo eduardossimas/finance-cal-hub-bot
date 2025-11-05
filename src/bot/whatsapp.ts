@@ -88,28 +88,56 @@ export async function startWhatsAppBot(): Promise<WASocket> {
         console.log('📨 ========================================');
         console.log('De:', from);
         console.log('Keys da mensagem:', Object.keys(msg.message || {}));
-        console.log('Mensagem completa:', JSON.stringify(msg.message, null, 2));
+        console.log('Tipo do primeiro key:', typeof Object.keys(msg.message || {})[0]);
+        console.log('Valor do primeiro key:', Object.keys(msg.message || {})[0]);
+        
+        // VERIFICAR ESPECIFICAMENTE O ÁUDIO
+        console.log('\n🔍 VERIFICAÇÕES DE ÁUDIO:');
+        console.log('   - msg.message existe?', !!msg.message);
+        console.log('   - msg.message?.audioMessage existe?', !!msg.message?.audioMessage);
+        console.log('   - Keys exatas:', JSON.stringify(Object.keys(msg.message || {})));
+        
+        // Verificar se tem alguma variação de "audio"
+        const keys = Object.keys(msg.message || {});
+        const audioKey = keys.find(k => k.toLowerCase().includes('audio'));
+        console.log('   - Key que contém "audio":', audioKey);
+        
+        if (audioKey) {
+          console.log('   - Conteúdo da key de áudio:', JSON.stringify(msg.message?.[audioKey as keyof typeof msg.message], null, 2));
+        }
+        
+        console.log('\nMensagem completa:', JSON.stringify(msg.message, null, 2));
         console.log('📨 ========================================\n');
 
         // Processar diferentes tipos de mensagem
         const messageType = Object.keys(msg.message || {})[0];
         console.log(`🔍 Tipo de mensagem detectado: "${messageType}"`);
+        console.log(`🔍 Comparando: messageType === "audioMessage"?`, messageType === 'audioMessage');
         
         // Mensagem de texto
         if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
           textToProcess = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
           console.log(`📝 Processando como TEXTO: "${textToProcess}"`);
         }
-        // Mensagem de áudio
-        else if (msg.message?.audioMessage) {
+        // Mensagem de áudio - TESTAR TODAS AS POSSIBILIDADES
+        else if (msg.message?.audioMessage || messageType === 'audioMessage' || messageType?.toLowerCase().includes('audio')) {
+          console.log('\n✅✅✅ ENTROU NO BLOCO DE ÁUDIO! ✅✅✅');
+          console.log('Condição satisfeita:', {
+            'msg.message?.audioMessage': !!msg.message?.audioMessage,
+            'messageType === audioMessage': messageType === 'audioMessage',
+            'messageType includes audio': messageType?.toLowerCase().includes('audio')
+          });
+          
           console.log('\n🎤 ========================================');
           console.log(`🎤 ÁUDIO RECEBIDO de ${from}`);
           console.log(`📱 Telefone: ${formattedPhone}`);
           console.log(`👤 User ID: ${userId}`);
           console.log('🎤 Informações do áudio:');
-          console.log('   - Seconds:', msg.message.audioMessage.seconds);
-          console.log('   - MimeType:', msg.message.audioMessage.mimetype);
-          console.log('   - FileLength:', msg.message.audioMessage.fileLength);
+          if (msg.message?.audioMessage) {
+            console.log('   - Seconds:', msg.message.audioMessage.seconds);
+            console.log('   - MimeType:', msg.message.audioMessage.mimetype);
+            console.log('   - FileLength:', msg.message.audioMessage.fileLength);
+          }
           console.log('🎤 ========================================\n');
           
           try {
