@@ -141,16 +141,33 @@ export async function extractTaskInfo(
  */
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string | null> {
   try {
+    console.log('\n🔊 ========================================');
+    console.log('🔊 INICIANDO TRANSCRIÇÃO DE ÁUDIO');
+    console.log('🔊 ========================================');
+    
     if (AI_PROVIDER !== 'openai' || !openai) {
-      console.error('❌ Transcrição de áudio requer OpenAI como provider');
+      console.error('❌ Provider não é OpenAI ou cliente não está inicializado');
+      console.error(`   AI_PROVIDER atual: ${AI_PROVIDER}`);
+      console.error(`   Cliente OpenAI: ${openai ? 'Inicializado' : 'NÃO inicializado'}`);
+      console.error('⚠️  Transcrição de áudio requer OpenAI como provider');
+      console.log('🔊 ========================================\n');
       return null;
     }
 
-    console.log('🎤 Iniciando transcrição de áudio...');
+    console.log('✅ Provider OpenAI verificado');
+    console.log(`📦 Tamanho do buffer recebido: ${audioBuffer.length} bytes`);
 
     // Criar um objeto File a partir do buffer
+    console.log('🔧 Criando objeto File a partir do buffer...');
     const audioFile = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' });
+    console.log(`✅ Arquivo criado: ${audioFile.name} (${audioFile.size} bytes, tipo: ${audioFile.type})`);
 
+    console.log('🌐 Enviando para OpenAI Whisper API...');
+    console.log('   Modelo: whisper-1');
+    console.log('   Idioma: pt (Português)');
+    
+    const startTime = Date.now();
+    
     // Usar Whisper para transcrever
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
@@ -158,10 +175,35 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string | nul
       language: 'pt', // Português
     });
 
-    console.log('✅ Áudio transcrito com sucesso');
+    const endTime = Date.now();
+    const duration = ((endTime - startTime) / 1000).toFixed(2);
+
+    console.log(`✅ Resposta recebida da OpenAI em ${duration}s`);
+    console.log(`📝 Texto transcrito: "${transcription.text}"`);
+    console.log(`📏 Comprimento: ${transcription.text.length} caracteres`);
+    console.log('🔊 ========================================\n');
+
     return transcription.text;
   } catch (error: any) {
-    console.error('❌ Erro ao transcrever áudio:', error.message);
+    console.error('\n❌ ========================================');
+    console.error('❌ ERRO NA TRANSCRIÇÃO DE ÁUDIO');
+    console.error('❌ ========================================');
+    console.error('Tipo de erro:', error.constructor.name);
+    console.error('Mensagem:', error.message);
+    
+    if (error.response) {
+      console.error('Resposta da API:');
+      console.error('  Status:', error.response.status);
+      console.error('  Dados:', JSON.stringify(error.response.data, null, 2));
+    }
+    
+    if (error.code) {
+      console.error('Código de erro:', error.code);
+    }
+    
+    console.error('Stack trace:', error.stack);
+    console.error('❌ ========================================\n');
+    
     return null;
   }
 }

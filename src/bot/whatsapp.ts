@@ -91,9 +91,15 @@ export async function startWhatsAppBot(): Promise<WASocket> {
         }
         // Mensagem de áudio
         else if (msg.message?.audioMessage) {
-          console.log(`🎤 Áudio recebido de ${from}`);
+          console.log('\n🎤 ========================================');
+          console.log(`🎤 ÁUDIO RECEBIDO de ${from}`);
+          console.log(`📱 Telefone: ${formattedPhone}`);
+          console.log(`👤 User ID: ${userId}`);
+          console.log('🎤 ========================================\n');
           
           try {
+            console.log('📥 [PASSO 1/4] Iniciando download do áudio...');
+            
             // Baixar o áudio
             const buffer = await downloadMediaMessage(
               msg,
@@ -109,12 +115,16 @@ export async function startWhatsAppBot(): Promise<WASocket> {
               throw new Error('Não foi possível baixar o áudio');
             }
 
-            console.log(`📥 Áudio baixado, tamanho: ${buffer.length} bytes`);
+            console.log(`✅ [PASSO 1/4] Áudio baixado com sucesso!`);
+            console.log(`📦 Tamanho do buffer: ${buffer.length} bytes (${(buffer.length / 1024).toFixed(2)} KB)`);
 
+            console.log('\n🔄 [PASSO 2/4] Iniciando transcrição com OpenAI Whisper...');
+            
             // Transcrever usando OpenAI Whisper
             const transcription = await transcribeAudio(buffer as Buffer);
 
             if (!transcription) {
+              console.error('❌ [PASSO 2/4] Transcrição falhou - retornou null/vazio');
               response = '❌ *Erro ao transcrever áudio*\n\n';
               response += 'Não consegui processar o áudio. Tente:\n';
               response += '• Enviar novamente\n';
@@ -122,23 +132,37 @@ export async function startWhatsAppBot(): Promise<WASocket> {
               response += '• Verificar se o áudio está claro';
               
               await sock.sendMessage(from, { text: response });
-              console.log(`⚠️ Falha na transcrição do áudio de ${from}`);
+              console.log(`⚠️ Resposta de erro enviada para ${from}`);
               continue;
             }
 
-            console.log(`✅ Áudio transcrito: "${transcription}"`);
+            console.log(`✅ [PASSO 2/4] Áudio transcrito com sucesso!`);
+            console.log(`📝 Transcrição: "${transcription}"`);
+            console.log(`📏 Tamanho da transcrição: ${transcription.length} caracteres\n`);
+            
+            console.log('💬 [PASSO 3/4] Enviando feedback ao usuário...');
+            
+            // Enviar feedback ao usuário
+            await sock.sendMessage(from, { 
+              text: `🎤 *Áudio transcrito:*\n"${transcription}"\n\n⏳ _Processando comando..._` 
+            });
+            
+            console.log('✅ [PASSO 3/4] Feedback enviado!');
             
             // Processar a transcrição como uma mensagem de texto normal
             textToProcess = transcription;
             
-            // Enviar feedback ao usuário
-            await sock.sendMessage(from, { 
-              text: `🎤 *Áudio transcrito:*\n"${transcription}"\n\n⏳ _Processando..._` 
-            });
+            console.log('🤖 [PASSO 4/4] Processando transcrição como mensagem de texto...');
           } catch (error: any) {
-            console.error('❌ Erro ao processar áudio:', error);
+            console.error('\n❌ ========================================');
+            console.error('❌ ERRO AO PROCESSAR ÁUDIO');
+            console.error('❌ ========================================');
+            console.error('Erro:', error);
+            console.error('Stack:', error.stack);
+            console.error('❌ ========================================\n');
+            
             response = '❌ *Erro ao processar áudio*\n\n';
-            response += 'Ocorreu um erro ao processar seu áudio.\n';
+            response += `Erro: ${error.message}\n\n`;
             response += '💡 Tente enviar uma mensagem de texto ou grave o áudio novamente.';
             
             await sock.sendMessage(from, { text: response });
