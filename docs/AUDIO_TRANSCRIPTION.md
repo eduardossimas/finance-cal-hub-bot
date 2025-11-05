@@ -30,11 +30,19 @@ Simplesmente grave e envie um áudio pelo WhatsApp descrevendo:
 
 ## Tecnologia
 
-### OpenAI Whisper
-- **Modelo:** `whisper-1`
-- **Idioma:** Português (pt)
+### Google Gemini 1.5 Pro
+- **Modelo:** `gemini-1.5-pro`
+- **Idioma:** Português (pt-BR)
 - **Formatos:** Suporta OGG, MP3, WAV, M4A, etc.
 - **Qualidade:** Alta precisão em português brasileiro
+- **Custo:** GRATUITO (dentro dos limites da API)
+
+### Arquitetura Híbrida
+O sistema usa uma abordagem híbrida:
+- 🎤 **Gemini** → Transcrição de áudio (gratuito)
+- 🤖 **OpenAI** → Processamento de mensagens e extração de tarefas (pago, mas mais preciso)
+
+Esta combinação oferece o melhor dos dois mundos: transcrição gratuita e processamento de alta qualidade.
 
 ### Fluxo Técnico
 
@@ -52,13 +60,13 @@ Simplesmente grave e envie um áudio pelo WhatsApp descrevendo:
          ▼
 ┌─────────────────────────┐
 │ transcribeAudio()       │
-│  (OpenAI Whisper)       │
+│  (Google Gemini)        │  ← GRATUITO
 └────────┬────────────────┘
          │
          ▼
 ┌─────────────────────────┐
 │ processMessage()        │
-│  (IA identifica intent) │
+│  (OpenAI - IA)          │  ← PAGO
 └────────┬────────────────┘
          │
          ▼
@@ -71,12 +79,18 @@ Simplesmente grave e envie um áudio pelo WhatsApp descrevendo:
 
 ### Variáveis de Ambiente
 ```env
-# OpenAI (necessário para transcrição)
+# Gemini (necessário para transcrição de áudio - GRATUITO)
+GEMINI_API_KEY=sua-api-key-do-google-ai-studio
+
+# OpenAI (necessário para processamento de mensagens)
 OPENAI_API_KEY=sk-...
 AI_PROVIDER=openai
 ```
 
-⚠️ **Importante:** A transcrição de áudio **requer OpenAI** como provider. Não funciona com Gemini.
+⚠️ **Importante:** 
+- **Gemini** é usado para transcrição de áudio (GRATUITO)
+- **OpenAI** é usado para processar mensagens e criar tarefas (pago)
+- Ambas as chaves são necessárias para funcionalidade completa
 
 ### Dependências
 ```json
@@ -88,23 +102,41 @@ AI_PROVIDER=openai
 
 ## Custos
 
-A API Whisper da OpenAI cobra por minuto de áudio transcrito:
+### Transcrição de Áudio: **GRATUITO** 🎉
 
-- **$0.006 por minuto** (aproximadamente R$0.03/minuto)
+O **Google Gemini** oferece transcrição de áudio **totalmente gratuita** dentro dos limites da API gratuita:
 
-**Exemplo de custo:**
-- 1 áudio de 30 segundos = $0.003 (R$0.015)
-- 100 áudios de 30 segundos/dia = $0.30/dia (R$1.50/dia)
-- 100 áudios de 30 segundos/dia x 30 dias = $9/mês (R$45/mês)
+- ✅ **60 requisições por minuto**
+- ✅ **1.500 requisições por dia**
+- ✅ **1 milhão de tokens por mês**
 
-💡 **Dica:** Incentive áudios curtos e objetivos para reduzir custos.
+Isso significa que você pode transcrever centenas de áudios por dia sem custo!
+
+### Processamento de Mensagens: Baixo Custo
+
+A OpenAI é usada apenas para processar o texto transcrito:
+
+- **GPT-4o-mini:** $0.150 / 1M tokens de entrada, $0.600 / 1M tokens de saída
+- Uma mensagem típica usa ~500 tokens
+- **Custo estimado:** $0.0003 por processamento (R$0.0015)
+
+**Exemplo de custo mensal:**
+- 100 áudios/dia = 3.000 áudios/mês
+- Transcrição: **R$0** (Gemini gratuito)
+- Processamento: ~R$4,50/mês (OpenAI)
+- **Total:** ~R$4,50/mês 🎯
+
+💡 **Economia:** Comparado com usar apenas OpenAI Whisper (~R$45/mês), você economiza 90%!
 
 ## Limitações
 
-1. **Provider:** Apenas OpenAI (Gemini não suporta transcrição de áudio via API)
-2. **Tamanho:** Máximo de 25MB por arquivo
-3. **Duração:** Recomendado até 2 minutos para melhor performance
-4. **Qualidade:** Áudios com ruído podem ter transcrição menos precisa
+1. **Limites da API Gratuita do Gemini:**
+   - 60 requisições/minuto
+   - 1.500 requisições/dia
+   - 1 milhão de tokens/mês
+2. **Tamanho:** Máximo de 25MB por arquivo (limite do WhatsApp)
+3. **Duração:** Funciona bem até 5 minutos de áudio
+4. **Qualidade:** Áudios com muito ruído podem ter transcrição menos precisa
 
 ## Tratamento de Erros
 
@@ -183,8 +215,20 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string | nul
 ## Suporte
 
 Em caso de problemas:
-1. Verifique se `OPENAI_API_KEY` está configurada
-2. Verifique se `AI_PROVIDER=openai` no `.env`
-3. Teste com áudio curto e claro
-4. Verifique os logs do console
-5. Envie mensagem de texto como alternativa
+1. Verifique se `GEMINI_API_KEY` está configurada (para transcrição)
+2. Verifique se `OPENAI_API_KEY` está configurada (para processamento)
+3. Verifique se `AI_PROVIDER=openai` no `.env`
+4. Teste com áudio curto e claro
+5. Verifique os logs do console (agora com detalhes completos)
+6. Envie mensagem de texto como alternativa
+
+### Logs Detalhados
+
+O sistema agora possui logs detalhados em cada etapa:
+- 🎤 Recebimento do áudio
+- 📥 Download do arquivo
+- 🔊 Transcrição com Gemini
+- 💬 Processamento com OpenAI
+- ✅ Resposta final
+
+Acompanhe o console para diagnóstico completo!

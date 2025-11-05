@@ -14,28 +14,26 @@ dotenv.config();
 // Configuração do provider de IA
 const AI_PROVIDER = process.env.AI_PROVIDER || 'openai'; // 'openai' ou 'gemini'
 
-// Configurar OpenAI
+// Configurar OpenAI (sempre inicializar para processamento de mensagens)
 let openai: OpenAI | null = null;
-if (AI_PROVIDER === 'openai') {
-  const openaiKey = process.env.OPENAI_API_KEY;
-  if (!openaiKey) {
-    throw new Error('❌ OPENAI_API_KEY não configurada no .env');
-  }
+const openaiKey = process.env.OPENAI_API_KEY;
+if (openaiKey) {
   openai = new OpenAI({ apiKey: openaiKey });
   console.log('✅ Cliente OpenAI inicializado');
+} else {
+  console.warn('⚠️  OPENAI_API_KEY não configurada - algumas funcionalidades podem não funcionar');
 }
 
-// Configurar Gemini
+// Configurar Gemini (sempre inicializar para transcrição de áudio)
 let genAI: GoogleGenerativeAI | null = null;
 let geminiModel: any = null;
-if (AI_PROVIDER === 'gemini') {
-  const geminiKey = process.env.GEMINI_API_KEY;
-  if (!geminiKey) {
-    throw new Error('❌ GEMINI_API_KEY não configurada no .env');
-  }
+const geminiKey = process.env.GEMINI_API_KEY;
+if (geminiKey) {
   genAI = new GoogleGenerativeAI(geminiKey);
   geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
   console.log('✅ Cliente Gemini AI inicializado');
+} else {
+  console.warn('⚠️  GEMINI_API_KEY não configurada - transcrição de áudio não funcionará');
 }
 
 /**
@@ -137,7 +135,7 @@ export async function extractTaskInfo(
 }
 
 /**
- * Transcreve áudio usando OpenAI Whisper
+ * Transcreve áudio usando Gemini (que suporta áudio nativamente)
  */
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string | null> {
   try {
@@ -145,45 +143,56 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string | nul
     console.log('🔊 INICIANDO TRANSCRIÇÃO DE ÁUDIO');
     console.log('🔊 ========================================');
     
-    if (AI_PROVIDER !== 'openai' || !openai) {
-      console.error('❌ Provider não é OpenAI ou cliente não está inicializado');
-      console.error(`   AI_PROVIDER atual: ${AI_PROVIDER}`);
-      console.error(`   Cliente OpenAI: ${openai ? 'Inicializado' : 'NÃO inicializado'}`);
-      console.error('⚠️  Transcrição de áudio requer OpenAI como provider');
+    // Verificar se Gemini está disponível
+    if (!genAI || !geminiModel) {
+      console.error('❌ Cliente Gemini não está inicializado');
+      console.error(`   genAI: ${genAI ? 'Inicializado' : 'NÃO inicializado'}`);
+      console.error(`   geminiModel: ${geminiModel ? 'Inicializado' : 'NÃO inicializado'}`);
+      console.error('⚠️  Verifique se GEMINI_API_KEY está configurada no .env');
       console.log('🔊 ========================================\n');
       return null;
     }
 
-    console.log('✅ Provider OpenAI verificado');
-    console.log(`📦 Tamanho do buffer recebido: ${audioBuffer.length} bytes`);
+    console.log('✅ Cliente Gemini verificado');
+    console.log(`📦 Tamanho do buffer recebido: ${audioBuffer.length} bytes (${(audioBuffer.length / 1024).toFixed(2)} KB)`);
 
-    // Criar um objeto File a partir do buffer
-    console.log('🔧 Criando objeto File a partir do buffer...');
-    const audioFile = new File([audioBuffer], 'audio.ogg', { type: 'audio/ogg' });
-    console.log(`✅ Arquivo criado: ${audioFile.name} (${audioFile.size} bytes, tipo: ${audioFile.type})`);
+    console.log('🔧 Preparando áudio para envio ao Gemini...');
+    
+    // Converter buffer para base64
+    const base64Audio = audioBuffer.toString('base64');
+    console.log(`✅ Áudio convertido para base64: ${base64Audio.length} caracteres`);
 
-    console.log('🌐 Enviando para OpenAI Whisper API...');
-    console.log('   Modelo: whisper-1');
-    console.log('   Idioma: pt (Português)');
+    console.log('🌐 Enviando para Gemini API...');
+    console.log('   Modelo: gemini-1.5-pro');
+    console.log('   Prompt: Transcrever áudio em português');
     
     const startTime = Date.now();
     
-    // Usar Whisper para transcrever
-    const transcription = await openai.audio.transcriptions.create({
-      file: audioFile,
-      model: 'whisper-1',
-      language: 'pt', // Português
-    });
+    // Usar Gemini para transcrever (suporta áudio nativamente)
+    const result = await geminiModel.generateContent([
+      {
+        inlineData: {
+          mimeType: 'audio/ogg',
+          data: base64Audio
+        }
+      },
+      {
+        text: 'Transcreva este áudio em português brasileiro. Retorne APENAS o texto falado, sem nenhuma explicação adicional, formatação ou comentário.'
+      }
+    ]);
 
     const endTime = Date.now();
     const duration = ((endTime - startTime) / 1000).toFixed(2);
 
-    console.log(`✅ Resposta recebida da OpenAI em ${duration}s`);
-    console.log(`📝 Texto transcrito: "${transcription.text}"`);
-    console.log(`📏 Comprimento: ${transcription.text.length} caracteres`);
+    const response = await result.response;
+    const transcription = response.text().trim();
+
+    console.log(`✅ Resposta recebida do Gemini em ${duration}s`);
+    console.log(`📝 Texto transcrito: "${transcription}"`);
+    console.log(`📏 Comprimento: ${transcription.length} caracteres`);
     console.log('🔊 ========================================\n');
 
-    return transcription.text;
+    return transcription;
   } catch (error: any) {
     console.error('\n❌ ========================================');
     console.error('❌ ERRO NA TRANSCRIÇÃO DE ÁUDIO');

@@ -8,8 +8,9 @@ Bot inteligente para WhatsApp integrado ao **Finance Cal Hub**, usando **Gemini 
 
 ### 🎤 **Transcrição de Áudio com IA**
 - ✅ Envie áudios pelo WhatsApp e o bot transcreve automaticamente
-- ✅ Usa **OpenAI Whisper** para alta precisão em português
-- ✅ Crie tarefas, consulte atividades ou faça perguntas por áudio
+- ✅ Usa **Google Gemini** para transcrição (GRATUITO!)
+- ✅ Processa com **OpenAI** para criar tarefas e entender comandos
+- ✅ Abordagem híbrida: transcrição gratuita + processamento preciso
 - 📖 [Documentação completa sobre áudios](./docs/AUDIO_TRANSCRIPTION.md)
 
 ### 📋 Consultas
@@ -90,13 +91,13 @@ Edite o `.env` com suas credenciais:
 SUPABASE_URL=https://seu-projeto.supabase.co
 SUPABASE_ANON_KEY=sua-chave-anon-aqui
 
-# AI Provider: 'openai' ou 'gemini'
+# AI Provider: 'openai' ou 'gemini' (para processamento de mensagens)
 AI_PROVIDER=openai
 
-# OpenAI (necessário para transcrição de áudio)
+# OpenAI (necessário para processamento de mensagens e criação de tarefas)
 OPENAI_API_KEY=sk-...
 
-# Google Gemini AI (alternativa gratuita, mas sem suporte a áudio)
+# Google Gemini AI (necessário para transcrição de áudio - GRATUITO)
 GEMINI_API_KEY=sua-api-key-do-google-ai-studio
 
 # Timezone para agendamento
@@ -106,11 +107,24 @@ TIMEZONE=America/Sao_Paulo
 DAILY_SUMMARY_CRON=0 8 * * *
 ```
 
+⚠️ **Importante:** Para funcionalidade completa de áudio:
+- `GEMINI_API_KEY` → Transcrição de áudio (GRATUITO)
+- `OPENAI_API_KEY` → Processamento e criação de tarefas
+
 ---
 
 ## 🔑 Obtendo as Credenciais
 
-### **OpenAI API Key (Para Transcrição de Áudio)**
+### **Google Gemini API Key (Para Transcrição de Áudio - GRATUITO)**
+
+1. Acesse [Google AI Studio](https://makersuite.google.com/app/apikey)
+2. Faça login com sua conta Google
+3. Clique em **"Get API Key"**
+4. Copie a chave e cole no `.env` como `GEMINI_API_KEY`
+
+✅ **Gratuito:** 1.500 requisições/dia, 60/minuto
+
+### **OpenAI API Key (Para Processamento de Mensagens)**
 
 1. Acesse [OpenAI Platform](https://platform.openai.com/api-keys)
 2. Faça login ou crie uma conta
@@ -118,17 +132,7 @@ DAILY_SUMMARY_CRON=0 8 * * *
 4. Copie a chave e cole no `.env` como `OPENAI_API_KEY`
 5. Configure `AI_PROVIDER=openai` no `.env`
 
-💰 **Custos:** ~$0.006/minuto de áudio transcrito (ver [documentação](./docs/AUDIO_TRANSCRIPTION.md))
-
-### **Gemini API Key (Alternativa Gratuita - sem áudio)**
-
-1. Acesse [Google AI Studio](https://makersuite.google.com/app/apikey)
-2. Faça login com sua conta Google
-3. Clique em **"Get API Key"**
-4. Copie a chave e cole no `.env` como `GEMINI_API_KEY`
-5. Configure `AI_PROVIDER=gemini` no `.env`
-
-⚠️ **Nota:** Gemini não suporta transcrição de áudio. Use OpenAI para essa funcionalidade.
+💰 **Custo baixo:** ~R$4,50/mês para 100 áudios/dia (GPT-4o-mini)
 
 ### **Supabase**
 
