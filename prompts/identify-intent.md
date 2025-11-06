@@ -42,13 +42,14 @@ Usuário quer **VER, BUSCAR ou CONSULTAR** informações existentes.
 ```
 
 ### 2. CRIAR TAREFA (create_task)
-Usuário quer **ADICIONAR, CRIAR ou AGENDAR** uma nova atividade.
+Usuário quer **ADICIONAR, CRIAR, AGENDAR, CADASTRAR** uma nova atividade.
 
 **Palavras-chave:**
 - Adicionar, criar, fazer, agendar
 - Preciso, tenho que, vou, devo
 - Reunião, call, ligar, enviar
 - Lembrar de, não esquecer
+- Cadastrar
 - [Ação] + [Cliente/Contexto]
 
 **Exemplos:**
@@ -57,6 +58,7 @@ Usuário quer **ADICIONAR, CRIAR ou AGENDAR** uma nova atividade.
 - "Adicionar tarefa: revisar código do EVO"
 - "Lembrar de fazer deploy"
 - "Tenho call com Dias Júnior na segunda"
+- "Cadastrar reunião com ConectFin amanhã"
 
 **Retornar:**
 ```json
