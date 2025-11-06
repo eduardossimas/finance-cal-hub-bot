@@ -30,8 +30,9 @@ let geminiModel: any = null;
 const geminiKey = process.env.GEMINI_API_KEY;
 if (geminiKey) {
   genAI = new GoogleGenerativeAI(geminiKey);
-  geminiModel = genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
-  console.log('✅ Cliente Gemini AI inicializado');
+  // Usar gemini-1.5-flash que suporta áudio
+  geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  console.log('✅ Cliente Gemini AI inicializado (modelo: gemini-1.5-flash)');
 } else {
   console.warn('⚠️  GEMINI_API_KEY não configurada - transcrição de áudio não funcionará');
 }
@@ -189,7 +190,7 @@ export async function transcribeAudio(audioBuffer: Buffer): Promise<string | nul
     console.log(`   📊 Primeiros 50 chars: ${base64Audio.substring(0, 50)}...`);
 
     console.log('\n🌐 [SUB-PASSO 2] Preparando requisição para Gemini...');
-    console.log('   📝 Modelo: gemini-1.5-pro');
+    console.log('   📝 Modelo: gemini-1.5-flash');
     console.log('   📝 MimeType: audio/ogg');
     console.log('   📝 Prompt: Transcrever áudio em português brasileiro');
     
