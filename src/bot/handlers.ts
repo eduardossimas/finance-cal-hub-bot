@@ -220,17 +220,30 @@ export async function handleCreateTaskCommand(userId: string, message: string): 
     const extracted = await extractTaskInfo(message, availableClients);
 
     if (!extracted) {
-      // Listar clientes disponíveis
+      // IA não conseguiu extrair informações
       let response = '🤔 *Não consegui entender sua mensagem*\n\n';
       response += `📋 *Clientes disponíveis:*\n`;
       availableClients.forEach((client, index) => {
-        response += `${index + 1}. ${client.name}\n`;
+        response += `   ${index + 1}. ${client.name}\n`;
       });
-      response += `\n💡 *Tente mencionar:*\n`;
-      response += `• O que fazer (ex: "reunião", "ligar", "enviar email")\n`;
-      response += `• Qual cliente (ex: "ConectFin", "Clínica Maria Inês")\n`;
-      response += `• Quando (ex: "hoje", "amanhã", "15/12")\n\n`;
+      response += `\n💡 *Para criar uma tarefa, mencione:*\n`;
+      response += `   • O que fazer (ex: "reunião", "ligar")\n`;
+      response += `   • Qual cliente\n`;
+      response += `   • Quando (ex: "hoje", "amanhã")\n\n`;
       response += `🔹 *Exemplo:* "reunião com ${availableClients[0].name} amanhã às 14h"`;
+      return response;
+    }
+
+    // Verificar se IA extraiu um cliente
+    if (!extracted.clientName || extracted.clientName.trim() === '') {
+      // IA não identificou nenhum cliente na mensagem
+      let response = '⚠️ *Não identifiquei o cliente nesta tarefa*\n\n';
+      response += `📋 *Clientes disponíveis:*\n`;
+      availableClients.forEach((client, index) => {
+        response += `   ${index + 1}. ${client.name}\n`;
+      });
+      response += `\n💡 *Por favor, mencione o cliente na sua mensagem.*\n\n`;
+      response += `🔹 *Exemplo:* "${extracted.title || 'sua tarefa'} para ${availableClients[0].name}"`;
       return response;
     }
 
@@ -240,13 +253,13 @@ export async function handleCreateTaskCommand(userId: string, message: string): 
     const result = await createActivityFromAI(userId, extracted);
 
     if (result.clientNotFound) {
-      // Cliente mencionado não existe
-      let response = `⚠️ *Cliente "${extracted.clientName}" não encontrado*\n\n`;
-      response += `📋 *Clientes cadastrados:*\n`;
+      // Cliente mencionado não existe no sistema
+      let response = `⚠️ *Cliente "${extracted.clientName}" não está cadastrado*\n\n`;
+      response += `📋 *Clientes cadastrados no sistema:*\n`;
       availableClients.forEach((client, index) => {
-        response += `${index + 1}. ${client.name}\n`;
+        response += `   ${index + 1}. ${client.name}\n`;
       });
-      response += `\n💡 *Você quis dizer algum destes?*\n`;
+      response += `\n💡 *Você quis dizer algum destes clientes?*\n`;
       response += `Ou cadastre "${extracted.clientName}" na plataforma web primeiro.`;
       return response;
     }
