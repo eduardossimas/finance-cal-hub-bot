@@ -139,146 +139,48 @@ export async function extractTaskInfo(
  * Transcreve áudio usando Gemini (que suporta áudio nativamente)
  */
 export async function transcribeAudio(audioBuffer: Buffer): Promise<string | null> {
-  console.log('\n🔊 ========================================');
-  console.log('🔊 FUNCTION transcribeAudio() CHAMADA');
-  console.log('🔊 ========================================');
-  
   try {
-    console.log('📥 Parâmetro recebido:');
-    console.log('   - Tipo:', typeof audioBuffer);
-    console.log('   - É Buffer?', Buffer.isBuffer(audioBuffer));
-    console.log('   - É nulo?', audioBuffer === null);
-    console.log('   - É undefined?', audioBuffer === undefined);
-    
-    if (audioBuffer) {
-      console.log('   - Length:', audioBuffer.length);
-      console.log('   - Primeiros 10 bytes:', audioBuffer.slice(0, 10));
-    }
-    
-    console.log('\n🔍 Verificando clientes Gemini...');
-    console.log('   - genAI existe?', genAI !== null && genAI !== undefined);
-    console.log('   - geminiModel existe?', geminiModel !== null && geminiModel !== undefined);
-    console.log('   - GEMINI_API_KEY configurada?', !!process.env.GEMINI_API_KEY);
-    
-    if (process.env.GEMINI_API_KEY) {
-      console.log('   - GEMINI_API_KEY length:', process.env.GEMINI_API_KEY.length);
-      console.log('   - GEMINI_API_KEY começa com:', process.env.GEMINI_API_KEY.substring(0, 10) + '...');
-    }
+    console.log('🎤 Iniciando transcrição de áudio...');
     
     // Verificar se Gemini está disponível
     if (!genAI || !geminiModel) {
-      console.error('\n❌ Cliente Gemini não está inicializado');
-      console.error('   genAI:', genAI);
-      console.error('   geminiModel:', geminiModel);
-      console.error('⚠️  Verifique se GEMINI_API_KEY está configurada no .env');
-      console.log('🔊 ========================================\n');
+      console.error('❌ Cliente Gemini não está inicializado');
       return null;
     }
 
-    console.log('\n✅ Cliente Gemini verificado e pronto');
-    console.log(`📦 Tamanho do buffer: ${audioBuffer.length} bytes (${(audioBuffer.length / 1024).toFixed(2)} KB)`);
-
-    console.log('\n🔧 [SUB-PASSO 1] Convertendo buffer para base64...');
-    const startConvert = Date.now();
+    console.log(`📦 Áudio: ${(audioBuffer.length / 1024).toFixed(2)} KB`);
     
     // Converter buffer para base64
     const base64Audio = audioBuffer.toString('base64');
     
-    const endConvert = Date.now();
-    console.log(`✅ [SUB-PASSO 1] Conversão completa em ${endConvert - startConvert}ms`);
-    console.log(`   📊 Base64 length: ${base64Audio.length} caracteres`);
-    console.log(`   📊 Primeiros 50 chars: ${base64Audio.substring(0, 50)}...`);
-
-    console.log('\n🌐 [SUB-PASSO 2] Preparando requisição para Gemini...');
-    console.log('   📝 Modelo: gemini-1.5-flash');
-    console.log('   📝 MimeType: audio/ogg');
-    console.log('   📝 Prompt: Transcrever áudio em português brasileiro');
-    
+    console.log('🌐 Enviando para Gemini API...');
     const startTime = Date.now();
     
-    console.log('\n🚀 [SUB-PASSO 3] Enviando para API do Gemini...');
-    
     // Usar Gemini para transcrever (suporta áudio nativamente)
-    let result;
-    try {
-      result = await geminiModel.generateContent([
-        {
-          inlineData: {
-            mimeType: 'audio/ogg',
-            data: base64Audio
-          }
-        },
-        {
-          text: 'Transcreva este áudio em português brasileiro. Retorne APENAS o texto falado, sem nenhuma explicação adicional, formatação ou comentário.'
+    const result = await geminiModel.generateContent([
+      {
+        inlineData: {
+          mimeType: 'audio/ogg',
+          data: base64Audio
         }
-      ]);
-      
-      console.log('✅ [SUB-PASSO 3] Requisição enviada com sucesso');
-    } catch (apiError: any) {
-      console.error('\n❌ Erro ao chamar geminiModel.generateContent():');
-      console.error('   Tipo:', apiError.constructor?.name);
-      console.error('   Mensagem:', apiError.message);
-      console.error('   Code:', apiError.code);
-      
-      if (apiError.response) {
-        console.error('   Response status:', apiError.response.status);
-        console.error('   Response data:', apiError.response.data);
+      },
+      {
+        text: 'Transcreva este áudio em português brasileiro. Retorne APENAS o texto falado, sem nenhuma explicação adicional, formatação ou comentário.'
       }
-      
-      throw apiError;
-    }
+    ]);
 
-    console.log('\n📡 [SUB-PASSO 4] Processando resposta do Gemini...');
-    console.log('   🔍 Result type:', typeof result);
-    console.log('   🔍 Result keys:', result ? Object.keys(result) : 'null');
-    
     const response = await result.response;
-    console.log('   ✅ Response obtido');
-    console.log('   🔍 Response type:', typeof response);
-    
     const transcription = response.text().trim();
     
-    const endTime = Date.now();
-    const duration = ((endTime - startTime) / 1000).toFixed(2);
-
-    console.log('\n✅ [SUB-PASSO 4] Transcrição extraída com sucesso!');
-    console.log(`⏱️  Tempo total: ${duration}s`);
-    console.log(`📝 Texto transcrito: "${transcription}"`);
-    console.log(`📏 Comprimento: ${transcription.length} caracteres`);
-    console.log('🔊 ========================================\n');
+    const duration = ((Date.now() - startTime) / 1000).toFixed(2);
+    console.log(`✅ Áudio transcrito em ${duration}s: "${transcription}"`);
 
     return transcription;
   } catch (error: any) {
-    console.error('\n❌ ========================================');
-    console.error('❌ ERRO NA FUNCTION transcribeAudio()');
-    console.error('❌ ========================================');
-    console.error('Tipo de erro:', error.constructor?.name || 'Desconhecido');
-    console.error('Mensagem:', error.message);
-    console.error('Name:', error.name);
-    
-    if (error.response) {
-      console.error('\nResposta da API Gemini:');
-      console.error('  Status:', error.response.status);
-      console.error('  StatusText:', error.response.statusText);
-      console.error('  Headers:', error.response.headers);
-      console.error('  Data:', JSON.stringify(error.response.data, null, 2));
+    console.error('❌ Erro ao transcrever áudio:', error.message);
+    if (error.status) {
+      console.error(`   Status: ${error.status} - ${error.statusText || ''}`);
     }
-    
-    if (error.code) {
-      console.error('Código de erro:', error.code);
-    }
-    
-    if (error.stack) {
-      console.error('\nStack trace:');
-      console.error(error.stack);
-    }
-    
-    // Log de todas as propriedades do erro
-    console.error('\nTodas as propriedades do erro:');
-    console.error(JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-    
-    console.error('❌ ========================================\n');
-    
     return null;
   }
 }

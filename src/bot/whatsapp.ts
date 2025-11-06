@@ -82,72 +82,20 @@ export async function startWhatsAppBot(): Promise<WASocket> {
         let textToProcess = '';
         let response = '';
 
-        // LOG: Ver estrutura completa da mensagem
-        console.log('\n📨 ========================================');
-        console.log('📨 NOVA MENSAGEM RECEBIDA');
-        console.log('📨 ========================================');
-        console.log('De:', from);
-        console.log('Keys da mensagem:', Object.keys(msg.message || {}));
-        console.log('Tipo do primeiro key:', typeof Object.keys(msg.message || {})[0]);
-        console.log('Valor do primeiro key:', Object.keys(msg.message || {})[0]);
-        
-        // VERIFICAR ESPECIFICAMENTE O ÁUDIO
-        console.log('\n🔍 VERIFICAÇÕES DE ÁUDIO:');
-        console.log('   - msg.message existe?', !!msg.message);
-        console.log('   - msg.message?.audioMessage existe?', !!msg.message?.audioMessage);
-        console.log('   - Keys exatas:', JSON.stringify(Object.keys(msg.message || {})));
-        
-        // Verificar se tem alguma variação de "audio"
-        const keys = Object.keys(msg.message || {});
-        const audioKey = keys.find(k => k.toLowerCase().includes('audio'));
-        console.log('   - Key que contém "audio":', audioKey);
-        
-        if (audioKey) {
-          console.log('   - Conteúdo da key de áudio:', JSON.stringify(msg.message?.[audioKey as keyof typeof msg.message], null, 2));
-        }
-        
-        console.log('\nMensagem completa:', JSON.stringify(msg.message, null, 2));
-        console.log('📨 ========================================\n');
-
         // Processar diferentes tipos de mensagem
         const messageType = Object.keys(msg.message || {})[0];
-        console.log(`🔍 Tipo de mensagem detectado: "${messageType}"`);
-        console.log(`🔍 Comparando: messageType === "audioMessage"?`, messageType === 'audioMessage');
         
         // Mensagem de texto
         if (msg.message?.conversation || msg.message?.extendedTextMessage?.text) {
           textToProcess = msg.message?.conversation || msg.message?.extendedTextMessage?.text || '';
-          console.log(`📝 Processando como TEXTO: "${textToProcess}"`);
         }
-        // Mensagem de áudio - TESTAR TODAS AS POSSIBILIDADES
+        // Mensagem de áudio
         else if (msg.message?.audioMessage || messageType === 'audioMessage' || messageType?.toLowerCase().includes('audio')) {
-          console.log('\n✅✅✅ ENTROU NO BLOCO DE ÁUDIO! ✅✅✅');
-          console.log('Condição satisfeita:', {
-            'msg.message?.audioMessage': !!msg.message?.audioMessage,
-            'messageType === audioMessage': messageType === 'audioMessage',
-            'messageType includes audio': messageType?.toLowerCase().includes('audio')
-          });
-          
-          console.log('\n🎤 ========================================');
-          console.log(`🎤 ÁUDIO RECEBIDO de ${from}`);
-          console.log(`📱 Telefone: ${formattedPhone}`);
-          console.log(`👤 User ID: ${userId}`);
-          console.log('🎤 Informações do áudio:');
-          if (msg.message?.audioMessage) {
-            console.log('   - Seconds:', msg.message.audioMessage.seconds);
-            console.log('   - MimeType:', msg.message.audioMessage.mimetype);
-            console.log('   - FileLength:', msg.message.audioMessage.fileLength);
-          }
-          console.log('🎤 ========================================\n');
+          console.log(`🎤 Áudio recebido de ${from}`);
+          console.log(`🎤 Áudio recebido de ${from}`);
           
           try {
-            console.log('📥 [PASSO 1/4] Iniciando download do áudio...');
-            console.log('   🔧 Verificando mensagem...');
-            console.log('   🔧 Tipo de mensagem:', typeof msg);
-            console.log('   🔧 Message keys:', Object.keys(msg.message || {}));
-            
             // Baixar o áudio
-            console.log('   🌐 Chamando downloadMediaMessage...');
             const buffer = await downloadMediaMessage(
               msg,
               'buffer',
@@ -158,86 +106,25 @@ export async function startWhatsAppBot(): Promise<WASocket> {
               }
             );
 
-            console.log('   ✅ downloadMediaMessage retornou');
-            console.log('   🔍 Tipo do buffer:', typeof buffer);
-            console.log('   🔍 Buffer é nulo?', buffer === null);
-            console.log('   🔍 Buffer é undefined?', buffer === undefined);
-
             if (!buffer) {
-              console.error('   ❌ Buffer é nulo ou undefined!');
               throw new Error('Não foi possível baixar o áudio');
             }
 
-            console.log(`✅ [PASSO 1/4] Áudio baixado com sucesso!`);
-            console.log(`📦 Tamanho do buffer: ${buffer.length} bytes (${(buffer.length / 1024).toFixed(2)} KB)`);
-            console.log(`📦 É um Buffer? ${Buffer.isBuffer(buffer)}`);
-
-            console.log('\n🔄 [PASSO 2/4] Iniciando transcrição com Gemini...');
-            console.log('   📤 Enviando buffer para transcribeAudio()...');
-            
             // Transcrever usando Gemini
             const transcription = await transcribeAudio(buffer as Buffer);
 
-            console.log('   📥 transcribeAudio() retornou');
-            console.log('   🔍 Tipo da transcrição:', typeof transcription);
-            console.log('   🔍 Transcrição é nula?', transcription === null);
-            console.log('   🔍 Transcrição é undefined?', transcription === undefined);
-            console.log('   🔍 Transcrição vazia?', transcription === '');
-
             if (!transcription) {
-              console.error('❌ [PASSO 2/4] Transcrição falhou - retornou null/vazio');
-              console.error('   ⚠️  Valor retornado:', transcription);
-              response = '❌ *Erro ao transcrever áudio*\n\n';
-              response += 'Não consegui processar o áudio. Tente:\n';
-              response += '• Enviar novamente\n';
-              response += '• Usar mensagem de texto\n';
-              response += '• Verificar se o áudio está claro';
-              
+              response = '❌ Não consegui processar o áudio. Tente enviar novamente ou use mensagem de texto.';
               await sock.sendMessage(from, { text: response });
-              console.log(`⚠️ Resposta de erro enviada para ${from}`);
               continue;
             }
 
-            console.log(`✅ [PASSO 2/4] Áudio transcrito com sucesso!`);
-            console.log(`📝 Transcrição: "${transcription}"`);
-            console.log(`📏 Tamanho da transcrição: ${transcription.length} caracteres\n`);
-            
-            console.log('💬 [PASSO 3/4] Enviando feedback ao usuário...');
-            
-            // Enviar feedback ao usuário
-            await sock.sendMessage(from, { 
-              text: `🎤 *Áudio transcrito:*\n"${transcription}"\n\n⏳ _Processando comando..._` 
-            });
-            
-            console.log('✅ [PASSO 3/4] Feedback enviado!');
-            
             // Processar a transcrição como uma mensagem de texto normal
             textToProcess = transcription;
-            
-            console.log('🤖 [PASSO 4/4] Processando transcrição como mensagem de texto...');
-            console.log('   📝 Texto a processar:', textToProcess);
+            console.log(`📝 Processando transcrição: "${transcription}"`);
           } catch (error: any) {
-            console.error('\n❌ ========================================');
-            console.error('❌ ERRO AO PROCESSAR ÁUDIO');
-            console.error('❌ ========================================');
-            console.error('Tipo de erro:', error.constructor?.name || 'Desconhecido');
-            console.error('Mensagem:', error.message);
-            console.error('Code:', error.code);
-            console.error('Stack:', error.stack);
-            
-            if (error.response) {
-              console.error('\nResposta HTTP:');
-              console.error('  Status:', error.response.status);
-              console.error('  StatusText:', error.response.statusText);
-              console.error('  Data:', JSON.stringify(error.response.data, null, 2));
-            }
-            
-            console.error('❌ ========================================\n');
-            
-            response = '❌ *Erro ao processar áudio*\n\n';
-            response += `Erro: ${error.message}\n\n`;
-            response += '💡 Tente enviar uma mensagem de texto ou grave o áudio novamente.';
-            
+            console.error('❌ Erro ao processar áudio:', error.message);
+            response = '❌ Erro ao processar áudio. Tente novamente ou use mensagem de texto.';
             await sock.sendMessage(from, { text: response });
             continue;
           }
