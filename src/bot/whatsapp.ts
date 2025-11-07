@@ -14,6 +14,40 @@ import { transcribeAudio } from '../services/ai';
 import { downloadMediaMessage } from '@whiskeysockets/baileys';
 const logger = P({ level: 'info' });
 
+function createTypingIndicator(sock: WASocket, jid: string) {
+  let interval: NodeJS.Timeout | null = null;
+
+  const sendTyping = async () => {
+    try {
+      await sock.sendPresenceUpdate('composing', jid);
+    } catch (error) {
+      console.error('Erro ao atualizar status de digitando:', error);
+    }
+  };
+
+  return {
+    start: async () => {
+      await sendTyping();
+      interval = setInterval(() => {
+        sock
+          .sendPresenceUpdate('composing', jid)
+          .catch((err) => console.error('Erro ao manter status de digitando:', err));
+      }, 6000);
+    },
+    stop: async () => {
+      if (interval) {
+        clearInterval(interval);
+        interval = null;
+      }
+      try {
+        await sock.sendPresenceUpdate('paused', jid);
+      } catch (error) {
+        console.error('Erro ao finalizar status de digitando:', error);
+      }
+    },
+  };
+}
+
 /**
  * Inicializa e conecta o bot WhatsApp
  */
@@ -78,7 +112,10 @@ export async function startWhatsAppBot(): Promise<WASocket> {
         continue;
       }
 
+      const typingIndicator = createTypingIndicator(sock, from);
+
       try {
+        await typingIndicator.start();
         let textToProcess = '';
         let response = '';
 
@@ -175,6 +212,8 @@ export async function startWhatsAppBot(): Promise<WASocket> {
       } catch (error: any) {
         console.error('❌ Erro ao processar mensagem:', error);
         // Não envia mensagem de erro para evitar spam em números não cadastrados
+      } finally {
+        await typingIndicator.stop();
       }
     }
   });
