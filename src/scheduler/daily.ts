@@ -82,21 +82,29 @@ export async function sendDailySummaries(sock: WASocket): Promise<void> {
  * Configura o scheduler de resumos diários
  */
 export function setupDailyScheduler(sock: WASocket): void {
-  const cronExpression = process.env.DAILY_SUMMARY_CRON || '0 8 * * *'; // Padrão: 8h da manhã
+  // 0 8 * * 1-5 = 8h da manhã, segunda a sexta (1=segunda, 5=sexta)
+  const cronExpression = process.env.DAILY_SUMMARY_CRON || '0 8 * * 1-5';
   const timezone = process.env.TIMEZONE || 'America/Sao_Paulo';
 
   console.log(`⏰ Agendamento configurado: ${cronExpression} (${timezone})`);
+  console.log(`📅 Resumos serão enviados de segunda a sexta-feira às 8h`);
 
   cron.schedule(
     cronExpression,
     async () => {
-      console.log('⏰ Executando rotina de resumos diários...');
+      const now = new Date().toLocaleString('pt-BR', { timeZone: timezone });
+      console.log(`\n⏰ [${now}] Executando rotina de resumos diários...`);
       await sendDailySummaries(sock);
     },
     {
       timezone,
+      scheduled: true,
     }
   );
 
   console.log('✅ Scheduler de resumos diários ativado');
+  
+  // Log adicional para debug
+  const nextExecution = cron.getTasks();
+  console.log(`📊 Tarefas agendadas: ${nextExecution.size}`);
 }
