@@ -3,3 +3,4 @@ dist/
 .env
 auth_info_baileys/
 *.log
+.env.backup
