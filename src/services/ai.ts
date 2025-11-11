@@ -31,7 +31,7 @@ const geminiKey = process.env.GEMINI_API_KEY;
 if (geminiKey) {
   genAI = new GoogleGenerativeAI(geminiKey);
   // Usar gemini-1.5-flash que suporta áudio
-  geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-exp' });
+  geminiModel = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' });
   console.log('✅ Cliente Gemini AI inicializado (modelo: gemini-1.5-flash)');
 } else {
   console.warn('⚠️  GEMINI_API_KEY não configurada - transcrição de áudio não funcionará');
