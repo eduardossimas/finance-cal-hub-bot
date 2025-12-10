@@ -1,6 +1,29 @@
 import { supabase } from '../config/supabase';
 import { Activity, User } from '../types';
 
+const ACTIVITY_SELECT =
+  '*, client:clients!activities_client_id_fkey (id, name)';
+
+function normalizeActivityClient(data: any): Activity {
+  if (!data) return data;
+
+  const clientName =
+    data.client_name ||
+    data.client?.name ||
+    data.clients?.name ||
+    null;
+
+  return {
+    ...data,
+    client_name: clientName || undefined,
+  };
+}
+
+function normalizeActivities(data: any[] | null): Activity[] {
+  if (!data) return [];
+  return data.map(normalizeActivityClient);
+}
+
 /**
  * Obtém o user_id através do número de telefone
  */
@@ -28,7 +51,7 @@ export async function getActivitiesToday(userId: string): Promise<Activity[]> {
 
   const { data, error } = await supabase
     .from('activities')
-    .select('*')
+    .select(ACTIVITY_SELECT)
     .eq('date', today)
     .contains('assigned_users', [userId])
     .order('created_at', { ascending: true });
@@ -38,7 +61,7 @@ export async function getActivitiesToday(userId: string): Promise<Activity[]> {
     return [];
   }
 
-  return data || [];
+  return normalizeActivities(data);
 }
 
 /**
@@ -47,7 +70,7 @@ export async function getActivitiesToday(userId: string): Promise<Activity[]> {
 export async function getPendingActivities(userId: string): Promise<Activity[]> {
   const { data, error } = await supabase
     .from('activities')
-    .select('*')
+    .select(ACTIVITY_SELECT)
     .contains('assigned_users', [userId])
     .in('status', ['pending', 'waiting-client', 'waiting-team'])
     .order('date', { ascending: true });
@@ -57,7 +80,7 @@ export async function getPendingActivities(userId: string): Promise<Activity[]> 
     return [];
   }
 
-  return data || [];
+  return normalizeActivities(data);
 }
 
 /**
@@ -66,7 +89,7 @@ export async function getPendingActivities(userId: string): Promise<Activity[]> 
 export async function getInProgressActivities(userId: string): Promise<Activity[]> {
   const { data, error } = await supabase
     .from('activities')
-    .select('*')
+    .select(ACTIVITY_SELECT)
     .contains('assigned_users', [userId])
     .eq('status', 'doing')
     .order('date', { ascending: true });
@@ -76,7 +99,7 @@ export async function getInProgressActivities(userId: string): Promise<Activity[
     return [];
   }
 
-  return data || [];
+  return normalizeActivities(data);
 }
 
 /**
@@ -90,18 +113,25 @@ export async function createActivity(
 ): Promise<Activity | null> {
   const today = new Date().toISOString().split('T')[0];
 
+  const clientId = clientName ? await getOrCreateClient(clientName) : null;
+
+  if (!clientId) {
+    console.log('⚠️ Cliente não especificado ou não encontrado - atividade não será criada');
+    return null;
+  }
+
   const { data, error } = await supabase
     .from('activities')
     .insert({
       title,
-      client_name: clientName,
+      client_id: clientId,
       assigned_users: [userId],
       assigned_to: userId,
       date: today,
       estimated_duration: estimatedMinutes,
       status: 'pending',
     })
-    .select()
+    .select(ACTIVITY_SELECT)
     .single();
 
   if (error) {
@@ -109,7 +139,7 @@ export async function createActivity(
     return null;
   }
 
-  return data;
+  return normalizeActivityClient(data);
 }
 
 /**
@@ -159,7 +189,7 @@ export async function findActivityByDescription(
   // Buscar atividades não concluídas do usuário
   const { data, error } = await supabase
     .from('activities')
-    .select('*')
+    .select(ACTIVITY_SELECT)
     .contains('assigned_users', [userId])
     .in('status', ['pending', 'doing', 'waiting-client', 'waiting-team'])
     .order('date', { ascending: false });
@@ -169,7 +199,7 @@ export async function findActivityByDescription(
     return [];
   }
 
-  return data || [];
+  return normalizeActivities(data);
 }
 
 /**
@@ -198,7 +228,11 @@ export function formatActivity(activity: Activity, index?: number): string {
   const time = activity.estimated_duration 
     ? ` | ⏱️ ${activity.estimated_duration}min` 
     : '';
-  const client = activity.client_name ? ` | 👤 ${activity.client_name}` : '';
+  const clientName =
+    activity.client_name ||
+    (activity as any).client?.name ||
+    (activity as any).clients?.name;
+  const client = clientName ? ` | 👤 ${clientName}` : '';
   
   return `${prefix}${activity.title}${client}${time} ${status}`;
 }
@@ -226,7 +260,7 @@ export async function getOverdueActivities(userId: string): Promise<Activity[]> 
 
   const { data, error } = await supabase
     .from('activities')
-    .select('*')
+    .select(ACTIVITY_SELECT)
     .contains('assigned_users', [userId])
     .lt('date', today)
     .in('status', ['pending', 'doing', 'waiting-client', 'waiting-team'])
@@ -237,7 +271,7 @@ export async function getOverdueActivities(userId: string): Promise<Activity[]> 
     return [];
   }
 
-  return data || [];
+  return normalizeActivities(data);
 }
 
 /**
@@ -246,7 +280,7 @@ export async function getOverdueActivities(userId: string): Promise<Activity[]> 
 export async function getActivitiesByDate(userId: string, date: string): Promise<Activity[]> {
   const { data, error } = await supabase
     .from('activities')
-    .select('*')
+    .select(ACTIVITY_SELECT)
     .contains('assigned_users', [userId])
     .eq('date', date)
     .order('created_at', { ascending: true });
@@ -256,7 +290,7 @@ export async function getActivitiesByDate(userId: string, date: string): Promise
     return [];
   }
 
-  return data || [];
+  return normalizeActivities(data);
 }
 
 /**
@@ -267,7 +301,7 @@ export async function getRemainingTodayActivities(userId: string): Promise<Activ
 
   const { data, error } = await supabase
     .from('activities')
-    .select('*')
+    .select(ACTIVITY_SELECT)
     .eq('date', today)
     .contains('assigned_users', [userId])
     .in('status', ['pending', 'doing', 'waiting-client', 'waiting-team'])
@@ -278,7 +312,7 @@ export async function getRemainingTodayActivities(userId: string): Promise<Activ
     return [];
   }
 
-  return data || [];
+  return normalizeActivities(data);
 }
 
 /**
@@ -375,7 +409,7 @@ export async function createActivityFromAI(
       status: 'pending',
       is_recurring: false,
     })
-    .select()
+    .select(ACTIVITY_SELECT)
     .single();
 
   if (error) {
@@ -383,7 +417,7 @@ export async function createActivityFromAI(
     return { activity: null, clientNotFound: false };
   }
 
-  return { activity: data, clientNotFound: false };
+  return { activity: normalizeActivityClient(data), clientNotFound: false };
 }
 
 /**

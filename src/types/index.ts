@@ -26,6 +26,10 @@ export interface Activity {
   description?: string;
   client_id?: string;
   client_name?: string;
+  client?: {
+    id: string;
+    name: string;
+  };
   assigned_to?: string;
   assigned_to_name?: string;
   assigned_users?: string[];
