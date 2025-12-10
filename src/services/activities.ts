@@ -78,13 +78,22 @@ export async function getUserIdByPhone(phone: string): Promise<string | null> {
  */
 export async function getActivitiesToday(userId: string): Promise<Activity[]> {
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  const todayDate = new Date(today);
-  const dayOfWeek = todayDate.getDay(); // 0 = domingo, 1 = segunda, etc.
-  const dayOfMonth = todayDate.getDate();
   
-  console.log(`📅 Buscando atividades de hoje (${today}) para usuário: ${userId}`);
+  // Extrair dia do mês e dia da semana diretamente da string para evitar problemas de timezone
+  const [year, month, day] = today.split('-').map(Number);
+  const todayDate = new Date(year, month - 1, day); // month é 0-indexed
+  const dayOfWeek = todayDate.getDay(); // 0 = domingo, 1 = segunda, etc.
+  const dayOfMonth = day; // Usar o valor direto da string
+  
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`📅 BUSCANDO ATIVIDADES DE HOJE: ${today}`);
+  console.log(`   Usuário ID: ${userId}`);
+  console.log(`   Dia da semana: ${dayOfWeek} (0=Dom, 1=Seg, ..., 6=Sab)`);
+  console.log(`   Dia do mês: ${dayOfMonth}`);
+  console.log(`${'='.repeat(60)}`);
 
   // 1. Buscar atividades específicas de hoje (não recorrentes ou recorrentes com data de hoje)
+  console.log('\n1️⃣ Buscando atividades com date = hoje...');
   const { data: todayActivities, error: error1 } = await supabase
     .from('activities')
     .select(ACTIVITY_SELECT)
@@ -93,11 +102,16 @@ export async function getActivitiesToday(userId: string): Promise<Activity[]> {
     .order('created_at', { ascending: true });
 
   if (error1) {
-    console.error('❌ Erro ao buscar atividades de hoje:', error1);
+    console.error('   ❌ Erro:', error1);
     return [];
   }
+  console.log(`   ✅ Encontradas: ${todayActivities?.length || 0}`);
+  todayActivities?.forEach(act => {
+    console.log(`      - ${act.title} (${act.is_recurring ? 'recorrente' : 'normal'})`);
+  });
 
   // 2. Buscar atividades recorrentes DIÁRIAS (independente da data)
+  console.log('\n2️⃣ Buscando atividades recorrentes DIÁRIAS...');
   const { data: dailyRecurring, error: error2 } = await supabase
     .from('activities')
     .select(ACTIVITY_SELECT)
@@ -106,10 +120,16 @@ export async function getActivitiesToday(userId: string): Promise<Activity[]> {
     .eq('recurrence_type', 'daily');
 
   if (error2) {
-    console.error('❌ Erro ao buscar atividades diárias:', error2);
+    console.error('   ❌ Erro:', error2);
+  } else {
+    console.log(`   ✅ Encontradas: ${dailyRecurring?.length || 0}`);
+    dailyRecurring?.forEach(act => {
+      console.log(`      - ${act.title} (data: ${act.date})`);
+    });
   }
 
   // 3. Buscar atividades recorrentes SEMANAIS que correspondem ao dia da semana de hoje
+  console.log('\n3️⃣ Buscando atividades recorrentes SEMANAIS...');
   const { data: weeklyRecurring, error: error3 } = await supabase
     .from('activities')
     .select(ACTIVITY_SELECT)
@@ -118,10 +138,17 @@ export async function getActivitiesToday(userId: string): Promise<Activity[]> {
     .eq('recurrence_type', 'weekly');
 
   if (error3) {
-    console.error('❌ Erro ao buscar atividades semanais:', error3);
+    console.error('   ❌ Erro:', error3);
+  } else {
+    console.log(`   ✅ Encontradas: ${weeklyRecurring?.length || 0}`);
+    weeklyRecurring?.forEach(act => {
+      const actDate = new Date(act.date);
+      console.log(`      - ${act.title} (data: ${act.date}, dia semana: ${actDate.getDay()})`);
+    });
   }
 
   // 4. Buscar atividades recorrentes MENSAIS que correspondem ao dia do mês
+  console.log('\n4️⃣ Buscando atividades recorrentes MENSAIS...');
   const { data: monthlyRecurring, error: error4 } = await supabase
     .from('activities')
     .select(ACTIVITY_SELECT)
@@ -130,47 +157,75 @@ export async function getActivitiesToday(userId: string): Promise<Activity[]> {
     .eq('recurrence_type', 'monthly');
 
   if (error4) {
-    console.error('❌ Erro ao buscar atividades mensais:', error4);
+    console.error('   ❌ Erro:', error4);
+  } else {
+    console.log(`   ✅ Encontradas: ${monthlyRecurring?.length || 0}`);
+    monthlyRecurring?.forEach(act => {
+      const actDate = new Date(act.date);
+      console.log(`      - ${act.title} (data: ${act.date}, dia do mês: ${actDate.getDate()})`);
+    });
   }
 
   // Combinar todas as atividades, evitando duplicatas
+  console.log('\n5️⃣ Combinando atividades...');
   const allActivities: any[] = [...(todayActivities || [])];
   const existingIds = new Set(allActivities.map(a => a.id));
 
   // Adicionar recorrentes diárias (todas devem aparecer hoje)
   if (dailyRecurring) {
+    let addedDaily = 0;
     dailyRecurring.forEach(activity => {
       if (!existingIds.has(activity.id)) {
         allActivities.push(activity);
         existingIds.add(activity.id);
+        addedDaily++;
+        console.log(`   + Adicionada diária: ${activity.title}`);
+      } else {
+        console.log(`   ⊘ Diária duplicada ignorada: ${activity.title}`);
       }
     });
+    console.log(`   Total de diárias adicionadas: ${addedDaily}`);
   }
 
   // Adicionar recorrentes semanais que correspondem ao dia da semana
   if (weeklyRecurring) {
+    let addedWeekly = 0;
     weeklyRecurring.forEach(activity => {
-      const activityDate = new Date(activity.date);
+      // Parsear data evitando problemas de timezone
+      const [actYear, actMonth, actDay] = activity.date.split('-').map(Number);
+      const activityDate = new Date(actYear, actMonth - 1, actDay);
       const activityDayOfWeek = activityDate.getDay();
+      console.log(`   Verificando semanal: ${activity.title} - Dia semana atividade: ${activityDayOfWeek}, Hoje: ${dayOfWeek}`);
+      
       // Mostrar se o dia da semana corresponder
       if (activityDayOfWeek === dayOfWeek && !existingIds.has(activity.id)) {
         allActivities.push(activity);
         existingIds.add(activity.id);
+        addedWeekly++;
+        console.log(`   + Adicionada semanal: ${activity.title}`);
       }
     });
+    console.log(`   Total de semanais adicionadas: ${addedWeekly}`);
   }
 
   // Adicionar recorrentes mensais que correspondem ao dia do mês
   if (monthlyRecurring) {
+    let addedMonthly = 0;
     monthlyRecurring.forEach(activity => {
-      const activityDate = new Date(activity.date);
-      const activityDayOfMonth = activityDate.getDate();
+      // Parsear dia do mês diretamente da string
+      const [, , actDay] = activity.date.split('-').map(Number);
+      const activityDayOfMonth = actDay;
+      console.log(`   Verificando mensal: ${activity.title} - Dia do mês atividade: ${activityDayOfMonth}, Hoje: ${dayOfMonth}`);
+      
       // Mostrar se o dia do mês corresponder
       if (activityDayOfMonth === dayOfMonth && !existingIds.has(activity.id)) {
         allActivities.push(activity);
         existingIds.add(activity.id);
+        addedMonthly++;
+        console.log(`   + Adicionada mensal: ${activity.title}`);
       }
     });
+    console.log(`   Total de mensais adicionadas: ${addedMonthly}`);
   }
 
   // Ordenar: primeiro não completadas, depois completadas
@@ -181,7 +236,20 @@ export async function getActivitiesToday(userId: string): Promise<Activity[]> {
     return aOrder - bOrder;
   });
 
-  console.log(`✅ ${allActivities.length} atividades encontradas para hoje (${todayActivities?.length || 0} específicas + ${allActivities.length - (todayActivities?.length || 0)} recorrentes)`);
+  console.log(`\n${'='.repeat(60)}`);
+  console.log(`📊 RESULTADO FINAL:`);
+  console.log(`   Total de atividades: ${allActivities.length}`);
+  console.log(`   - Específicas de hoje: ${todayActivities?.length || 0}`);
+  console.log(`   - Recorrentes adicionadas: ${allActivities.length - (todayActivities?.length || 0)}`);
+  console.log(`\n   Lista final:`);
+  allActivities.forEach((act, idx) => {
+    const completedToday = act.is_recurring && isRecurringActivityCompletedOnDate(act, today);
+    console.log(`   ${idx + 1}. ${act.title}`);
+    console.log(`      Tipo: ${act.is_recurring ? `Recorrente ${act.recurrence_type}` : 'Normal'}`);
+    console.log(`      Status: ${act.status}${completedToday ? ' (completada hoje)' : ''}`);
+  });
+  console.log(`${'='.repeat(60)}\n`);
+  
   return normalizeActivities(allActivities);
 }
 
