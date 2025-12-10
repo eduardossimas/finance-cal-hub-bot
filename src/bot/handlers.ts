@@ -14,6 +14,7 @@ import {
   formatDate,
   getDaysOverdue,
   parseNaturalDate,
+  isRecurringActivityCompletedOnDate,
 } from '../services/activities';
 import { summarizeActivities, answerQuestion, extractTaskInfo, identifyActivityToComplete, identifyIntent } from '../services/ai';
 
@@ -360,6 +361,72 @@ export async function handleCompleteTaskCommand(userId: string, message: string)
 }
 
 /**
+ * Handler para concluir tarefa por número
+ */
+export async function handleCompleteTaskByNumber(userId: string, taskNumber: number): Promise<string> {
+  try {
+    console.log(`✅ Tentando concluir tarefa número ${taskNumber}`);
+    
+    // Buscar atividades de hoje do usuário
+    const todayActivities = await getActivitiesToday(userId);
+    
+    if (todayActivities.length === 0) {
+      return '📅 Você não tem atividades para hoje.\n\n💡 Use "hoje" para ver suas atividades.';
+    }
+    
+    // Verificar se o número é válido
+    if (taskNumber < 1 || taskNumber > todayActivities.length) {
+      return `❌ *Número inválido*\n\nVocê tem ${todayActivities.length} atividade${todayActivities.length > 1 ? 's' : ''} hoje.\n\n💡 Use "hoje" para ver a lista completa.`;
+    }
+    
+    // Pegar a atividade (índice é número - 1)
+    const activity = todayActivities[taskNumber - 1];
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Verificar se é recorrente e já foi completada hoje
+    if (activity.is_recurring && isRecurringActivityCompletedOnDate(activity, today)) {
+      return `✅ *${activity.title}* já foi marcada como concluída hoje!\n\n💡 Use "restantes" para ver o que ainda falta fazer.`;
+    }
+    
+    // Verificar se já está concluída (atividades não recorrentes)
+    if (!activity.is_recurring && activity.status === 'completed') {
+      return `✅ *${activity.title}* já está concluída!\n\n💡 Use "restantes" para ver o que ainda falta fazer.`;
+    }
+    
+    // Para atividades recorrentes, precisamos atualizar o campo description
+    if (activity.is_recurring) {
+      return `⚠️ *Conclusão de atividades recorrentes*\n\nPor favor, marque como concluída diretamente no aplicativo.\n\nEsta funcionalidade estará disponível em breve no bot! 🚀`;
+    }
+    
+    // Concluir a atividade
+    const completed = await completeActivity(activity.id);
+    
+    if (!completed) {
+      return '❌ Erro ao concluir atividade. Tente novamente.';
+    }
+    
+    let response = `✅ *Atividade Concluída!*\n\n`;
+    response += `${taskNumber}. ${activity.title}\n`;
+    
+    if (activity.client_name) {
+      response += `👤 Cliente: ${activity.client_name}\n`;
+    }
+    
+    if (activity.estimated_duration) {
+      response += `⏱️ Tempo estimado: ${activity.estimated_duration}min\n`;
+    }
+    
+    response += `\n🎉 Parabéns! Continue assim!`;
+    response += `\n\n💡 Use "restantes" para ver o que ainda falta fazer.`;
+    
+    return response;
+  } catch (error: any) {
+    console.error('Erro ao concluir tarefa por número:', error);
+    return '❌ Erro ao processar sua solicitação. Tente novamente.';
+  }
+}
+
+/**
  * Handler para comando "resumo"
  */
 export async function handleSummaryCommand(userId: string): Promise<string> {
@@ -443,29 +510,25 @@ Você pode enviar áudios e eu vou transcrever automaticamente usando IA!
 ---
 
 *📊 Ver Suas Tarefas:*
-• \`hoje\` - Tarefas de hoje
-• \`restantes\` - O que falta fazer hoje
-• \`pendentes\` - Todas pendentes
-• \`vencidas\` - Tarefas atrasadas
+• \`hoje\` ou \`quais minhas atividades de hoje\`
+• \`amanhã\` ou \`o que tenho amanhã\`
+• \`restantes\` ou \`o que falta fazer\`
+• \`pendentes\` ou \`minhas tarefas pendentes\`
+• \`fazendo\` ou \`o que estou fazendo\`
+• \`vencidas\` ou \`tarefas atrasadas\`
 • \`resumo\` - Resumo inteligente do dia
 
-*📅 Ver por Data:*
-• \`amanhã\` - Tarefas de amanhã
-• \`15/12\` - Tarefas de data específica
-
 *✅ Concluir Tarefas:*
-• \`concluir [nome da tarefa]\`
-• \`finalizar [nome da tarefa]\`
+• \`concluir 2\` - Marca a tarefa 2 como concluída
+• \`finalizar tarefa 1\` - Marca a tarefa 1 como concluída
+• \`completar 3\` - Marca a tarefa 3 como concluída
+• \`feito 1\` - Marca a tarefa 1 como concluída
+• \`ok 2\` - Marca a tarefa 2 como concluída
+
+💡 _Os números se referem à ordem que aparecem em "hoje"_
 
 *👥 Clientes:*
-• \`clientes\` - Ver todos os clientes
-
-*ℹ️ Outros:*
-• \`ajuda\` - Ver este menu
-
----
-
-💡 *Dica:* Não precisa usar comandos específicos para criar tarefas. Apenas descreva o que você precisa fazer e eu entendo!
+• \`clientes\` - Ver clientes disponíveis
 
 ⚠️ *Importante:* Toda tarefa precisa ter um cliente. Use \`clientes\` para ver a lista.
   `.trim();
@@ -477,31 +540,67 @@ Você pode enviar áudios e eu vou transcrever automaticamente usando IA!
 export async function processMessage(userId: string, message: string): Promise<string> {
   const normalizedMessage = message.toLowerCase().trim();
 
-  // Comandos específicos de consulta (APENAS ESTES NÃO CRIAM TAREFA)
-  if (normalizedMessage === 'hoje' || normalizedMessage === 'atividades') {
+  // ========== COMANDOS DE CONSULTA ==========
+  
+  // Hoje - todas as variações
+  if (normalizedMessage === 'hoje' || 
+      normalizedMessage === 'atividades' ||
+      normalizedMessage.match(/^(quais?|qual|me mostra?|mostra?|ver|lista?) .*(atividade|tarefa|compromisso)s? .*(hoje|hj)$/i) ||
+      normalizedMessage.match(/^(minhas?|as) (atividade|tarefa|compromisso)s? .*(hoje|hj)$/i) ||
+      normalizedMessage.match(/^(o que|oque) .*(tenho|tem) (hoje|hj)$/i)) {
     return handleTodayCommand(userId);
   }
 
-  if (normalizedMessage === 'pendentes' || normalizedMessage === 'pendente') {
+  // Amanhã - todas as variações
+  if (normalizedMessage === 'amanhã' || 
+      normalizedMessage === 'amanha' ||
+      normalizedMessage.match(/^(quais?|qual|me mostra?|mostra?|ver|lista?) .*(atividade|tarefa|compromisso)s? .*(amanhã|amanha)$/i) ||
+      normalizedMessage.match(/^(minhas?|as) (atividade|tarefa|compromisso)s? .*(amanhã|amanha)$/i) ||
+      normalizedMessage.match(/^(o que|oque) .*(tenho|tem) (amanhã|amanha)$/i)) {
+    return handleDateCommand(userId, 'amanhã');
+  }
+
+  // Pendentes - todas as variações
+  if (normalizedMessage === 'pendentes' || 
+      normalizedMessage === 'pendente' ||
+      normalizedMessage.match(/^(quais?|qual|me mostra?|mostra?|ver|lista?) .*(atividade|tarefa|compromisso)s? .*(pendente|em aberto|abertas?)$/i) ||
+      normalizedMessage.match(/^(minhas?|as) (atividade|tarefa|compromisso)s? .*(pendente|em aberto|abertas?)$/i)) {
     return handlePendingCommand(userId);
   }
 
-  if (normalizedMessage === 'fazendo' || normalizedMessage === 'andamento') {
+  // Em andamento - todas as variações
+  if (normalizedMessage === 'fazendo' || 
+      normalizedMessage === 'andamento' ||
+      normalizedMessage.match(/^(quais?|qual|me mostra?|mostra?|ver|lista?) .*(atividade|tarefa|compromisso)s? .*(fazendo|andamento|em progresso)$/i) ||
+      normalizedMessage.match(/^(minhas?|as) (atividade|tarefa|compromisso)s? .*(fazendo|andamento|em progresso)$/i)) {
     return handleInProgressCommand(userId);
   }
 
-  if (normalizedMessage === 'vencidas' || normalizedMessage === 'atrasadas' || normalizedMessage === 'vencida' || normalizedMessage === 'atrasada') {
+  // Vencidas - todas as variações
+  if (normalizedMessage === 'vencidas' || 
+      normalizedMessage === 'atrasadas' || 
+      normalizedMessage === 'vencida' || 
+      normalizedMessage === 'atrasada' ||
+      normalizedMessage.match(/^(quais?|qual|me mostra?|mostra?|ver|lista?) .*(atividade|tarefa|compromisso)s? .*(vencida|atrasada|atrasado)s?$/i) ||
+      normalizedMessage.match(/^(minhas?|as) (atividade|tarefa|compromisso)s? .*(vencida|atrasada|atrasado)s?$/i)) {
     return handleOverdueCommand(userId);
   }
 
-  if (normalizedMessage === 'restantes' || normalizedMessage === 'falta fazer' || normalizedMessage === 'restante') {
+  // Restantes - todas as variações
+  if (normalizedMessage === 'restantes' || 
+      normalizedMessage === 'falta fazer' || 
+      normalizedMessage === 'restante' ||
+      normalizedMessage.match(/^(o que|oque) .*(falta|resta|restam?) .*fazer$/i) ||
+      normalizedMessage.match(/^(quais?|qual) .*(atividade|tarefa|compromisso)s? .*(falta|resta|restam?)$/i)) {
     return handleRemainingCommand(userId);
   }
 
+  // Resumo
   if (normalizedMessage === 'resumo') {
     return handleSummaryCommand(userId);
   }
 
+  // Ajuda
   if (normalizedMessage === 'ajuda' || normalizedMessage === 'help' || normalizedMessage === 'menu') {
     return handleHelpCommand();
   }
@@ -511,11 +610,7 @@ export async function processMessage(userId: string, message: string): Promise<s
     return handleListClientsCommand();
   }
 
-  // Consultas por data
-  if (normalizedMessage === 'amanhã' || normalizedMessage === 'amanha') {
-    return handleDateCommand(userId, 'amanhã');
-  }
-
+  // Próxima semana
   if (normalizedMessage.includes('próxima semana') || normalizedMessage.includes('proxima semana')) {
     return handleDateCommand(userId, 'próxima semana');
   }
@@ -529,7 +624,20 @@ export async function processMessage(userId: string, message: string): Promise<s
     }
   }
 
-  // Comandos de conclusão de tarefa
+  // ========== COMANDOS DE CONCLUSÃO ==========
+  
+  // Concluir tarefa por número: "concluir tarefa 2", "completar 1", "finalizar atividade 3"
+  const completeByNumberPattern = /^(concluir|finalizar|concluída?|completar|feito|pronto|ok|done|marcar como (concluída?|feita?|completa?)) +(tarefa|atividade|item|número|numero|n[oº°])? *(\d+)$/i;
+  const completeNumberMatch = normalizedMessage.match(completeByNumberPattern);
+  
+  if (completeNumberMatch) {
+    // O número está sempre no último grupo capturado
+    const taskNumber = parseInt(completeNumberMatch[completeNumberMatch.length - 1]);
+    console.log(`✅ Detectado comando de conclusão por número: ${taskNumber}`);
+    return handleCompleteTaskByNumber(userId, taskNumber);
+  }
+
+  // Concluir tarefa por descrição
   if (normalizedMessage.startsWith('concluir ') || 
       normalizedMessage.startsWith('finalizar ') || 
       normalizedMessage.startsWith('concluída ') ||
@@ -554,7 +662,18 @@ export async function processMessage(userId: string, message: string): Promise<s
       if (intent.intent === 'query' && intent.filters) {
         console.log(`📋 Consulta detectada com filtros:`, intent.filters);
         
-        // Se tem data específica no formato ISO (YYYY-MM-DD)
+        // Verificar se é consulta de HOJE (de qualquer forma)
+        const today = new Date().toISOString().split('T')[0];
+        const isToday = intent.filters.date === today || 
+                       intent.filters.period === 'today' ||
+                       (intent.filters.date && intent.filters.date === today);
+        
+        if (isToday) {
+          console.log(`📅 Consulta identificada como HOJE - usando handleTodayCommand`);
+          return handleTodayCommand(userId);
+        }
+        
+        // Se tem data específica no formato ISO (YYYY-MM-DD) e NÃO é hoje
         if (intent.filters.date) {
           const dateISO = intent.filters.date;
           
@@ -583,15 +702,13 @@ export async function processMessage(userId: string, message: string): Promise<s
         
         // Se tem período
         if (intent.filters.period) {
-          if (intent.filters.period === 'today') {
-            return handleTodayCommand(userId);
-          }
           if (intent.filters.period === 'current_week') {
             return '📅 *Atividades da Semana Atual*\n\nRecurso em desenvolvimento! Por enquanto, use "hoje", "amanhã" ou datas específicas (DD/MM).';
           }
         }
         
-        // Consulta genérica de hoje
+        // Consulta genérica - retornar hoje por padrão
+        console.log(`📅 Consulta genérica - retornando atividades de hoje`);
         return handleTodayCommand(userId);
       }
       
